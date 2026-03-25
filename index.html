@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foundy | O que se perdeu, volta.</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="nav-left">
+            <div class="logo">FOUNDY<span>.</span></div>
+            <div id="authArea">
+                <button class="btn-auth" onclick="abrirModalAuth()">Entrar / Criar Conta</button>
+            </div>
+        </div>
+        <div class="search-box">
+            <input type="text" id="inputPesquisa" onkeyup="pesquisarItens()" placeholder="Buscar item ou local...">
+        </div>
+        <div class="nav-right">
+            <div id="karmaDisplay" class="karma-badge">✨ Karma: <span id="valKarma">0</span></div>
+            <button class="btn-post" onclick="abrirModalPost()">+ Achei Algo</button>
+        </div>
+    </nav>
+
+    <main class="container">
+        <header class="hero">
+            <h1>O que se perdeu, <span>volta.</span></h1>
+            <p>A tecnologia Bumerangue conectando comunidades.</p>
+        </header>
+
+        <div class="filter-bar">
+            <button class="filter-btn active" onclick="filtrarCategoria('Todos')">📍 Todos</button>
+            <button class="filter-btn" onclick="filtrarCategoria('Chaves')">🔑 Chaves</button>
+            <button class="filter-btn" onclick="filtrarCategoria('Documentos')">📄 Documentos</button>
+            <button class="filter-btn" onclick="filtrarCategoria('Eletrônicos')">📱 Eletrônicos</button>
+            <button class="filter-btn" onclick="filtrarCategoria('Pets')">🐶 Pets</button>
+        </div>
+
+        <section class="map-section">
+            <div class="map-container-main">
+                <button class="btn-gps" onclick="minhaLocalizacao()">📍 Onde estou?</button>
+                <div id="mapaPrincipal"></div>
+            </div>
+        </section>
+
+        <div class="grid-items" id="itemGrid"></div>
+    </main>
+
+    <div id="modalAuth" class="modal">
+        <div class="modal-content">
+            <h2>Bem-vindo ao Foundy</h2>
+            <input type="text" id="nomeUser" placeholder="Seu Nome Completo">
+            <input type="email" id="emailUser" placeholder="Seu melhor e-mail">
+            <button class="btn-save" onclick="cadastrarOuLogar()">Começar a Devolver</button>
+            <button class="btn-cancel" onclick="fecharModalAuth()">Voltar</button>
+        </div>
+    </div>
+
+    <div id="modalPost" class="modal">
+        <div class="modal-content">
+            <h3>Postar Item Encontrado</h3>
+            <div class="upload-zone" onclick="document.getElementById('fotoItem').click()">
+                <img id="preview" src="" style="display:none">
+                <div id="uploadPlaceholder">📸 Clique para tirar foto</div>
+            </div>
+            <input type="file" id="fotoItem" accept="image/*" onchange="analisarFoto(event)" style="display:none">
+            <div id="focoInteligente" class="ai-tags"></div>
+            <input type="text" id="tituloItem" placeholder="Título do item">
+            <select id="categoriaItem">
+                <option value="Outros">Categoria...</option>
+                <option value="Chaves">Chaves</option>
+                <option value="Documentos">Documentos</option>
+                <option value="Eletrônicos">Eletrônicos</option>
+                <option value="Pets">Pets</option>
+            </select>
+            <div id="mapaPost"></div>
+            <input type="hidden" id="latLogItem">
+            <input type="text" id="perguntaSeguranca" placeholder="Pergunta de posse (ex: Qual a marca?)">
+            <div class="modal-actions">
+                <button class="btn-save" onclick="salvarPost()">Publicar</button>
+                <button class="btn-cancel" onclick="fecharModalPost()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalConvite" class="modal">
+        <div class="modal-content">
+            <h3>Enviar Pedido de Resgate</h3>
+            <p>Responda à pergunta do achador:</p>
+            <blockquote id="perguntaExibida"></blockquote>
+            <textarea id="respostaConvite" placeholder="Sua resposta detalhada..."></textarea>
+            <div class="modal-actions">
+                <button class="btn-save" onclick="enviarPedidoChat()">Enviar Convite</button>
+                <button class="btn-cancel" onclick="fecharModalConvite()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalChat" class="modal">
+        <div class="modal-content">
+            <div class="chat-header">
+                <h4 id="chatTitle">Conversa</h4>
+                <button onclick="fecharChat()">×</button>
+            </div>
+            <div id="chatMessages" class="chat-messages"></div>
+            <div class="chat-input">
+                <input type="text" id="msgInput" placeholder="Sua mensagem...">
+                <button onclick="enviarMensagem()">➡️</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
