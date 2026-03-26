@@ -182,12 +182,17 @@ function itensFiltrados() {
 }
 
 // --- AUTENTICAÇÃO E VALIDAÇÕES ---
+
 function toggleAuthMode() {
     isLoginMode = !isLoginMode;
+    
+    // Atualiza os textos do modal com base no estado (Login ou Cadastro)
     document.getElementById('authTitle').innerText = isLoginMode ? "Entrar na Conta" : "Criar Conta Foundy";
-    document.getElementById('camposCadastroAdicionais').style.display = isLoginMode ? "none" : "block";
-    document.getElementById('regNome').style.display = isLoginMode ? "none" : "block";
+    document.getElementById('btnAuthSubmit').innerText = isLoginMode ? "Entrar" : "Cadastrar";
     document.getElementById('toggleAuth').innerText = isLoginMode ? "Não tem conta? Cadastrar" : "Já tem conta? Entrar";
+    
+    // Mostra ou esconde os campos extras de cadastro
+    document.getElementById('camposCadastroAdicionais').style.display = isLoginMode ? "none" : "block";
 }
 
 function verificarIdade() {
@@ -198,6 +203,7 @@ function verificarIdade() {
     const nascimento = new Date(dataNasc);
     let idade = hoje.getFullYear() - nascimento.getFullYear();
     const m = hoje.getMonth() - nascimento.getMonth();
+    
     if (m < 0 || (m === 0 && hoje.getDate() < nascimento.getDate())) {
         idade--;
     }
@@ -214,64 +220,67 @@ function verificarIdade() {
 async function handleSignUp() {
     const email = document.getElementById('regEmail').value;
     const password = document.getElementById('regPass').value;
+    const btnSubmit = document.getElementById('btnAuthSubmit');
     
-    if (isLoginMode) {
-        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-        if (error) return alert("Erro ao entrar: " + error.message);
-        window.location.reload();
-    } else {
-        const fullName = document.getElementById('regNome').value;
-        const phone = document.getElementById('regPhone').value;
-        const cpf = document.getElementById('regCpf').value;
-        const dataNasc = document.getElementById('regDataNasc').value;
-        
-        // Validação de Menores
-        const divRespVisivel = document.getElementById('authResponsavel').style.display === 'block';
-        const checkboxResponsavel = document.getElementById('checkResponsavel').checked;
-        if (divRespVisivel && !checkboxResponsavel) {
-            return alert("Como você é menor de idade, precisamos da confirmação de que possui autorização do seu responsável.");
-        }
+    if (!email || !password) return alert("Por favor, preencha E-mail e Senha.");
 
-        if(!fullName || !email || !password || !cpf) return alert("Preencha os campos obrigatórios.");
+    // Feedback visual de carregamento
+    btnSubmit.innerText = "Aguarde...";
+    btnSubmit.disabled = true;
+    
+    try {
+        if (isLoginMode) {
+            // LÓGICA DE LOGIN
+            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) throw error;
+            
+            window.location.reload(); // Recarrega para atualizar a interface com o usuário logado
+            
+        } else {
+            // LÓGICA DE CADASTRO
+            const fullName = document.getElementById('regNome').value;
+            const phone = document.getElementById('regPhone').value;
+            const cpf = document.getElementById('regCpf').value;
+            const dataNasc = document.getElementById('regDataNasc').value;
+            
+            if(!fullName || !cpf) return alert("Preencha seu Nome e CPF.");
 
-        const { error } = await supabaseClient.auth.signUp({
-            email, password,
-            options: { 
-                data: { 
-                    full_name: fullName, 
-                    phone: phone,
-                    cpf: cpf, // Num cenário real, deve ser criptografado ou regido por RLS estrito
-                    data_nascimento: dataNasc
-                } 
+            // Validação de Menores
+            const divRespVisivel = document.getElementById('authResponsavel').style.display === 'block';
+            const checkboxResponsavel = document.getElementById('checkResponsavel').checked;
+            
+            if (divRespVisivel && !checkboxResponsavel) {
+                btnSubmit.innerText = "Cadastrar";
+                btnSubmit.disabled = false;
+                return alert("Como você é menor de idade, precisamos da confirmação de que possui autorização do seu responsável.");
             }
-        });
-        if (error) return alert(error.message);
-        alert("Conta criada! Verifique seu e-mail para confirmar ou faça login.");
-        toggleAuthMode();
+
+            const { error } = await supabaseClient.auth.signUp({
+                email, 
+                password,
+                options: { 
+                    data: { 
+                        full_name: fullName, 
+                        phone: phone,
+                        cpf: cpf, 
+                        data_nascimento: dataNasc
+                    } 
+                }
+            });
+            
+            if (error) throw error;
+            
+            alert("Conta criada com sucesso! Verifique seu e-mail para confirmar a conta ou faça login.");
+            toggleAuthMode(); // Muda para a tela de login automaticamente após cadastrar
+        }
+    } catch (err) {
+        alert("Erro: " + err.message);
+    } finally {
+        // Restaura o botão
+        btnSubmit.innerText = isLoginMode ? "Entrar" : "Cadastrar";
+        btnSubmit.disabled = false;
     }
 }
-
-function calcularKarma() {
-    // Karma = (Itens postados pelo usuário) * 10
-    const meusItens = itensCadastrados.filter(i => i.user_id === currentUser.id);
-    const karma = meusItens.length * 10;
-    document.getElementById('valKarma').innerText = karma;
-    document.getElementById('karmaDisplay').style.display = 'block';
-}
-
-function atualizarUI() {
-    const authArea = document.getElementById('authArea');
-    if(currentUser) {
-        const primeiroNome = currentUser.user_metadata.full_name?.split(' ')[0] || "Usuário";
-        authArea.innerHTML = `<span style="font-weight:600;">Olá, <span style="color:var(--primary);">${primeiroNome}</span></span> <button onclick="sairConta()" style="background:none; border:none; color:var(--text-muted); cursor:pointer; margin-left:10px; font-size: 0.8rem;">Sair</button>`;
-    }
-}
-
-async function sairConta() {
-    await supabaseClient.auth.signOut();
-    window.location.reload();
-}
-
 // --- MAPAS ---
 function initMapaPrincipal() {
     if (!mapaPrincipal) {
