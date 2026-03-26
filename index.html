@@ -51,28 +51,32 @@
 
     <div id="modalAuth" class="modal">
         <div class="modal-content">
-            <h2 id="authTitle">Minha Conta Foundy</h2>
+            <h2 id="authTitle">Entrar na Conta</h2>
+            
             <div id="authForm">
-                <input type="text" id="regNome" placeholder="Nome Completo">
-                <input type="email" id="regEmail" placeholder="E-mail">
-                <input type="password" id="regPass" placeholder="Senha (mín. 6 caracteres)">
-                
-                <div id="camposCadastroAdicionais">
-                    <input type="text" id="regCpf" placeholder="CPF (Apenas números)" maxlength="11">
-                    <input type="tel" id="regPhone" placeholder="Telefone (WhatsApp)">
-                    <label style="font-size: 0.8rem; color: var(--text-muted); margin-top: 10px; display: block;">Data de Nascimento</label>
-                    <input type="date" id="regDataNasc" onchange="verificarIdade()">
+                <div id="stepRequest">
+                    <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px;">
+                        Digite seu número com o código do país e DDD para receber o token de acesso.
+                    </p>
+                    <input type="tel" id="authPhone" placeholder="Ex: +5511999999999">
+                    <input type="text" id="authName" placeholder="Seu Nome Completo (Apenas para novos cadastros)" style="display:none;">
                     
-                    <div id="authResponsavel" style="display:none; margin: 10px 0; font-size: 0.85rem; color: #fbbf24; background: rgba(251, 191, 36, 0.1); padding: 10px; border-radius: 8px;">
-                        <input type="checkbox" id="checkResponsavel" style="width: auto; margin-right: 10px;">
-                        <label for="checkResponsavel">Sou menor de idade e declaro ter autorização dos meus responsáveis legais para usar o Foundy.</label>
-                    </div>
+                    <button class="btn-save" id="btnSendToken" onclick="enviarToken()">Enviar Código por SMS</button>
+                    <p id="toggleAuth" onclick="toggleAuthMode()" style="cursor:pointer; font-size: 0.85rem; text-align:center; margin-top:15px; color: var(--primary);">Novo por aqui? Criar conta</p>
                 </div>
 
-                <button class="btn-save" onclick="handleSignUp()">Continuar</button>
-                <p id="toggleAuth" onclick="toggleAuthMode()" style="cursor:pointer; font-size: 0.8rem; text-align:center; margin-top:15px; color: var(--primary);">Já tem conta? Entrar</p>
+                <div id="stepVerify" style="display:none;">
+                    <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px;">
+                        Enviamos um código de 6 dígitos para o seu número.
+                    </p>
+                    <input type="text" id="authToken" placeholder="Código de 6 dígitos (Ex: 123456)" maxlength="6" style="text-align: center; font-size: 1.2rem; letter-spacing: 5px;">
+                    
+                    <button class="btn-save" id="btnVerifyToken" onclick="verificarToken()">Verificar e Entrar</button>
+                    <button class="btn-cancel" onclick="voltarStepAuth()">Tentar outro número</button>
+                </div>
             </div>
-            <button class="btn-cancel" onclick="fecharModalAuth()">Voltar</button>
+            
+            <button class="btn-cancel" onclick="fecharModalAuth()" style="margin-top: 15px; border-top: 1px solid var(--border); border-radius: 0;">Fechar</button>
         </div>
     </div>
 

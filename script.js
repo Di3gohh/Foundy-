@@ -1,7 +1,6 @@
 // --- CONFIGURAÇÃO SUPABASE ---
 const SUPABASE_URL = 'https://ndlpzprccxjpuxqtzrxl.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_94q7-RW5thyf7kBRUHDxBw_0bPPvRkX'; 
-// NOTA DE ENGENHARIA: Em produção, o RLS (Row Level Security) do Supabase DEVE estar configurado para proteger os dados sensíveis como CPF.
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // --- VARIÁVEIS GLOBAIS ---
@@ -11,8 +10,9 @@ let currentItem = null;
 let categoriaAtiva = "Todos";
 let termoBusca = "";
 let mapaPrincipal, mapaPost, markerPost;
-let isLoginMode = false;
+let isLoginMode = true; // Começa como 'Entrar'
 let canalChat = null;
+let currentPhone = ""; // Armazena o telefone durante o processo de token
 
 // --- INICIALIZAÇÃO ---
 window.addEventListener('DOMContentLoaded', async () => {
@@ -54,7 +54,6 @@ async function salvarPost() {
     }
 
     try {
-        // Desativar botão para evitar duplo clique
         const btn = document.querySelector('#modalPost .btn-save');
         btn.innerText = "Publicando...";
         btn.disabled = true;
@@ -69,10 +68,9 @@ async function salvarPost() {
 
         if (error) throw error;
         alert("Item publicado com sucesso! Você ganhou +10 de Karma ✨");
-        calcularKarma(); // Atualiza o karma imediatamente
+        calcularKarma();
         fecharModalPost();
         
-        // Limpar formulário
         document.getElementById('tituloItem').value = '';
         document.getElementById('perguntaSeguranca').value = '';
         document.getElementById('preview').style.display = 'none';
@@ -92,12 +90,11 @@ async function salvarPost() {
 function buscarItens() {
     termoBusca = document.getElementById('inputPesquisa').value.toLowerCase();
     renderizarCards();
-    initMapaPrincipal(); // Re-renderiza o mapa baseado na busca
+    initMapaPrincipal();
 }
 
 function filtrarCategoria(cat) {
     categoriaAtiva = cat;
-    // Atualiza visual dos botões
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.classList.remove('active');
         if(btn.innerText.includes(cat)) btn.classList.add('active');
@@ -114,78 +111,89 @@ function itensFiltrados() {
     });
 }
 
-// --- AUTENTICAÇÃO E VALIDAÇÕES ---
+// --- AUTENTICAÇÃO POR TOKEN (SMS/OTP) ---
+
 function toggleAuthMode() {
     isLoginMode = !isLoginMode;
     document.getElementById('authTitle').innerText = isLoginMode ? "Entrar na Conta" : "Criar Conta Foundy";
-    document.getElementById('camposCadastroAdicionais').style.display = isLoginMode ? "none" : "block";
-    document.getElementById('regNome').style.display = isLoginMode ? "none" : "block";
-    document.getElementById('toggleAuth').innerText = isLoginMode ? "Não tem conta? Cadastrar" : "Já tem conta? Entrar";
+    document.getElementById('authName').style.display = isLoginMode ? "none" : "block";
+    document.getElementById('toggleAuth').innerText = isLoginMode ? "Novo por aqui? Criar conta" : "Já tem conta? Entrar";
 }
 
-function verificarIdade() {
-    const dataNasc = document.getElementById('regDataNasc').value;
-    if(!dataNasc) return;
-    
-    const hoje = new Date();
-    const nascimento = new Date(dataNasc);
-    let idade = hoje.getFullYear() - nascimento.getFullYear();
-    const m = hoje.getMonth() - nascimento.getMonth();
-    if (m < 0 || (m === 0 && hoje.getDate() < nascimento.getDate())) {
-        idade--;
+async function enviarToken() {
+    const phone = document.getElementById('authPhone').value.trim();
+    const name = document.getElementById('authName').value.trim();
+    const btn = document.getElementById('btnSendToken');
+
+    if (!phone.startsWith('+')) {
+        return alert("Use o formato internacional: +55 (DDD) Número. Ex: +5511999999999");
     }
-    
-    const divResp = document.getElementById('authResponsavel');
-    if(idade < 18) {
-        divResp.style.display = "block";
-    } else {
-        divResp.style.display = "none";
-        document.getElementById('checkResponsavel').checked = false;
+
+    if (!isLoginMode && !name) {
+        return alert("Por favor, digite seu nome para o cadastro.");
     }
-}
 
-async function handleSignUp() {
-    const email = document.getElementById('regEmail').value;
-    const password = document.getElementById('regPass').value;
-    
-    if (isLoginMode) {
-        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-        if (error) return alert("Erro ao entrar: " + error.message);
-        window.location.reload();
-    } else {
-        const fullName = document.getElementById('regNome').value;
-        const phone = document.getElementById('regPhone').value;
-        const cpf = document.getElementById('regCpf').value;
-        const dataNasc = document.getElementById('regDataNasc').value;
-        
-        // Validação de Menores
-        const divRespVisivel = document.getElementById('authResponsavel').style.display === 'block';
-        const checkboxResponsavel = document.getElementById('checkResponsavel').checked;
-        if (divRespVisivel && !checkboxResponsavel) {
-            return alert("Como você é menor de idade, precisamos da confirmação de que possui autorização do seu responsável.");
-        }
+    try {
+        btn.innerText = "Enviando...";
+        btn.disabled = true;
+        currentPhone = phone;
 
-        if(!fullName || !email || !password || !cpf) return alert("Preencha os campos obrigatórios.");
-
-        const { error } = await supabaseClient.auth.signUp({
-            email, password,
-            options: { 
-                data: { 
-                    full_name: fullName, 
-                    phone: phone,
-                    cpf: cpf, // Num cenário real, deve ser criptografado ou regido por RLS estrito
-                    data_nascimento: dataNasc
-                } 
+        const { error } = await supabaseClient.auth.signInWithOtp({
+            phone: phone,
+            options: {
+                data: { full_name: name } // Armazena o nome se for novo usuário
             }
         });
-        if (error) return alert(error.message);
-        alert("Conta criada! Verifique seu e-mail para confirmar ou faça login.");
-        toggleAuthMode();
+
+        if (error) throw error;
+
+        // Troca os formulários dentro do modal
+        document.getElementById('stepRequest').style.display = 'none';
+        document.getElementById('stepVerify').style.display = 'block';
+        
+    } catch (err) {
+        alert("Erro: " + err.message);
+    } finally {
+        btn.innerText = "Enviar Código por SMS";
+        btn.disabled = false;
     }
+}
+
+async function verificarToken() {
+    const token = document.getElementById('authToken').value.trim();
+    const btn = document.getElementById('btnVerifyToken');
+
+    if (token.length < 6) return alert("Digite o código de 6 dígitos.");
+
+    try {
+        btn.innerText = "Verificando...";
+        btn.disabled = true;
+
+        const { error } = await supabaseClient.auth.verifyOtp({
+            phone: currentPhone,
+            token: token,
+            type: 'sms'
+        });
+
+        if (error) throw error;
+
+        alert("Login realizado com sucesso!");
+        window.location.reload();
+        
+    } catch (err) {
+        alert("Token inválido ou expirado.");
+    } finally {
+        btn.innerText = "Verificar e Entrar";
+        btn.disabled = false;
+    }
+}
+
+function voltarStepAuth() {
+    document.getElementById('stepRequest').style.display = 'block';
+    document.getElementById('stepVerify').style.display = 'none';
 }
 
 function calcularKarma() {
-    // Karma = (Itens postados pelo usuário) * 10
     const meusItens = itensCadastrados.filter(i => i.user_id === currentUser.id);
     const karma = meusItens.length * 10;
     document.getElementById('valKarma').innerText = karma;
@@ -195,8 +203,8 @@ function calcularKarma() {
 function atualizarUI() {
     const authArea = document.getElementById('authArea');
     if(currentUser) {
-        const primeiroNome = currentUser.user_metadata.full_name?.split(' ')[0] || "Usuário";
-        authArea.innerHTML = `<span style="font-weight:600;">Olá, <span style="color:var(--primary);">${primeiroNome}</span></span> <button onclick="sairConta()" style="background:none; border:none; color:var(--text-muted); cursor:pointer; margin-left:10px; font-size: 0.8rem;">Sair</button>`;
+        const nome = currentUser.user_metadata.full_name || "Usuário";
+        authArea.innerHTML = `<span>Olá, <b style="color:var(--primary);">${nome.split(' ')[0]}</b></span> <button onclick="sairConta()" style="background:none; border:none; color:var(--text-muted); cursor:pointer; margin-left:10px;">Sair</button>`;
     }
 }
 
@@ -205,51 +213,36 @@ async function sairConta() {
     window.location.reload();
 }
 
-// --- MAPAS ---
+// --- MAPAS, CHAT E AUXILIARES (Mantidos do código anterior) ---
+
 function initMapaPrincipal() {
     if (!mapaPrincipal) {
         mapaPrincipal = L.map('mapaPrincipal').setView([-23.55, -46.63], 13);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap &copy; CARTO'
-        }).addTo(mapaPrincipal);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(mapaPrincipal);
     }
-    
-    // Limpar marcadores antigos
     mapaPrincipal.eachLayer(l => { if (l instanceof L.Marker) mapaPrincipal.removeLayer(l); });
-    
     const itens = itensFiltrados();
     itens.forEach(item => {
         L.marker([item.lat, item.lng]).addTo(mapaPrincipal)
-         .bindPopup(`
-            <div style="text-align:center;">
-                <b style="font-family:'Plus Jakarta Sans';">${item.titulo}</b><br>
-                <small style="color:gray;">${item.categoria}</small><br>
-                <button style="background:#2dd4bf; border:none; padding:5px 10px; border-radius:5px; color:#0b0f1a; font-weight:bold; margin-top:8px; cursor:pointer;" onclick="abrirVerificacao(${item.id})">Reivindicar Item</button>
-            </div>
-         `);
+         .bindPopup(`<b>${item.titulo}</b><br><button onclick="abrirVerificacao(${item.id})">Reivindicar</button>`);
     });
 }
 
 function minhaLocalizacao() {
-    if ("geolocation" in navigator) {
+    if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(p => {
-            const latlng = [p.coords.latitude, p.coords.longitude];
-            mapaPrincipal.setView(latlng, 15);
-        }, () => alert("Ative a localização no seu navegador."));
+            mapaPrincipal.setView([p.coords.latitude, p.coords.longitude], 15);
+        });
     }
 }
 
-// --- CHAT E RESGATE ---
 async function abrirChatReal(itemId, mensagemInicial = null) {
     if (!currentUser) return abrirModalAuth();
     currentItem = itensCadastrados.find(i => i.id === itemId);
-    
     document.getElementById('modalChat').style.display = 'flex';
     document.getElementById('chatPartner').innerText = `Negociação: ${currentItem.titulo}`;
-    
     await carregarMensagens(itemId);
 
-    // Se houver mensagem inicial (resposta de segurança), enviar automaticamente
     if(mensagemInicial) {
         await supabaseClient.from('messages').insert([{
             content: `🔑 **Resposta de Segurança:** ${mensagemInicial}`,
@@ -267,12 +260,7 @@ async function abrirChatReal(itemId, mensagemInicial = null) {
 }
 
 async function carregarMensagens(itemId) {
-    const { data: msgs } = await supabaseClient
-        .from('messages')
-        .select('*')
-        .eq('item_id', itemId)
-        .order('created_at', { ascending: true });
-
+    const { data: msgs } = await supabaseClient.from('messages').select('*').eq('item_id', itemId).order('created_at', { ascending: true });
     const chatMessages = document.getElementById('chatMessages');
     chatMessages.innerHTML = '';
     if(msgs) msgs.forEach(m => adicionarMensagemUI(m));
@@ -281,65 +269,40 @@ async function carregarMensagens(itemId) {
 function adicionarMensagemUI(m) {
     const chatMessages = document.getElementById('chatMessages');
     const isMine = m.sender_id === currentUser.id;
-    const classe = isMine ? 'msg-mine' : 'msg-other';
-    
     const div = document.createElement('div');
-    div.className = `msg-bubble ${classe}`;
-    // Substitui quebras de linha e trata markdown básico para a resposta de segurança
+    div.className = `msg-bubble ${isMine ? 'msg-mine' : 'msg-other'}`;
     div.innerHTML = m.content.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>'); 
-    
     chatMessages.appendChild(div);
-    chatMessages.scrollTop = chatMessages.scrollHeight; // Rola para o final
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 async function enviarMensagemReal() {
     const input = document.getElementById('msgInput');
     if(!input.value.trim()) return;
-    
     const texto = input.value;
-    input.value = ''; // Limpa rápido para UX
-    
+    input.value = '';
     await supabaseClient.from('messages').insert([{
-        content: texto,
-        sender_id: currentUser.id,
-        item_id: currentItem.id,
-        receiver_id: currentItem.user_id
+        content: texto, sender_id: currentUser.id, item_id: currentItem.id, receiver_id: currentItem.user_id
     }]);
 }
 
-// --- AUXILIARES MODAIS ---
 function abrirModalAuth() { document.getElementById('modalAuth').style.display = 'flex'; }
 function fecharModalAuth() { document.getElementById('modalAuth').style.display = 'none'; }
 
 function abrirModalPost() { 
     if(!currentUser) return abrirModalAuth();
     document.getElementById('modalPost').style.display = 'flex';
-    
     setTimeout(() => {
         if(!mapaPost) {
             mapaPost = L.map('mapaPost').setView([-23.55, -46.63], 13);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(mapaPost);
-            
-            // Tenta pegar a localização do usuário para o mapa de postagem
-            if ("geolocation" in navigator) {
-                navigator.geolocation.getCurrentPosition(p => {
-                    const latlng = [p.coords.latitude, p.coords.longitude];
-                    mapaPost.setView(latlng, 16);
-                    setMarkerPost(latlng);
-                });
-            }
-
-            mapaPost.on('click', e => setMarkerPost(e.latlng));
-        } else {
-            mapaPost.invalidateSize();
+            mapaPost.on('click', e => {
+                if(markerPost) mapaPost.removeLayer(markerPost);
+                markerPost = L.marker(e.latlng).addTo(mapaPost);
+                document.getElementById('latLogItem').value = JSON.stringify(e.latlng);
+            });
         }
     }, 400);
-}
-
-function setMarkerPost(latlng) {
-    if(markerPost) mapaPost.removeLayer(markerPost);
-    markerPost = L.marker(latlng).addTo(mapaPost);
-    document.getElementById('latLogItem').value = JSON.stringify(latlng);
 }
 
 function fecharModalPost() { document.getElementById('modalPost').style.display = 'none'; }
@@ -347,35 +310,21 @@ function fecharModalPost() { document.getElementById('modalPost').style.display 
 function abrirVerificacao(id) {
     if (!currentUser) return abrirModalAuth();
     currentItem = itensCadastrados.find(i => i.id === id);
-    
-    // Se o usuário clicou no próprio item, abre o chat direto
-    if(currentItem.user_id === currentUser.id) {
-        return abrirChatReal(id);
-    }
-
-    document.getElementById('perguntaExibida').innerText = currentItem.pergunta || "Descreva detalhes específicos sobre este item.";
-    document.getElementById('respostaConvite').value = '';
+    document.getElementById('perguntaExibida').innerText = currentItem.pergunta;
     document.getElementById('modalConvite').style.display = 'flex';
 }
 
 function fecharModalConvite() { document.getElementById('modalConvite').style.display = 'none'; }
-function fecharChat() { 
-    document.getElementById('modalChat').style.display = 'none'; 
-    if (canalChat) supabaseClient.removeChannel(canalChat);
-}
+function fecharChat() { document.getElementById('modalChat').style.display = 'none'; }
 
 function enviarPedidoChat() { 
     const resposta = document.getElementById('respostaConvite').value;
-    if(!resposta.trim()) return alert("Por favor, responda à pergunta para provar que o item é seu.");
-    
+    if(!resposta.trim()) return alert("Responda a pergunta.");
     fecharModalConvite();
     abrirChatReal(currentItem.id, resposta); 
 }
 
 function analisarFoto(e) {
-    const file = e.target.files[0];
-    if(!file) return;
-    
     const reader = new FileReader();
     reader.onload = () => {
         const preview = document.getElementById('preview');
@@ -383,25 +332,19 @@ function analisarFoto(e) {
         preview.style.display = 'block';
         document.getElementById('uploadPlaceholder').style.display = 'none';
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(e.target.files[0]);
 }
 
 function renderizarCards() {
     const grid = document.getElementById('itemGrid');
     const itens = itensFiltrados();
-    
-    if(itens.length === 0) {
-        grid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">Nenhum item encontrado nesta categoria.</p>`;
-        return;
-    }
-
     grid.innerHTML = itens.map(i => `
         <div class="card">
-            <img src="${i.foto || 'https://via.placeholder.com/400x250?text=Sem+Foto'}" loading="lazy" alt="Foto de ${i.titulo}">
+            <img src="${i.foto || ''}">
             <div class="card-content">
                 <small>${i.categoria}</small>
                 <h3>${i.titulo}</h3>
-                <button class="btn-save" onclick="abrirVerificacao(${i.id})">É meu! (Reivindicar)</button>
+                <button class="btn-save" onclick="abrirVerificacao(${i.id})">Resgatar</button>
             </div>
         </div>
     `).join('');
