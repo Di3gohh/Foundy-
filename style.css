@@ -1,85 +1,197 @@
 :root {
     --primary: #2dd4bf;
     --primary-hover: #14b8a6;
+    --primary-glow: rgba(45, 212, 191, 0.25);
     --bg: #0b0f1a;
+    --bg-glass: rgba(11, 15, 26, 0.7);
     --card: #1e293b;
-    --border: rgba(51, 65, 85, 0.5);
+    --border: rgba(51, 65, 85, 0.6);
+    --border-light: rgba(255, 255, 255, 0.1);
     --text: #f8fafc;
     --text-muted: #94a3b8;
     --radius: 16px;
+    --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; transition: all 0.2s ease; font-family: 'Plus Jakarta Sans', sans-serif; }
+/* ================== BASE & RESET ================== */
+* { box-sizing: border-box; margin: 0; padding: 0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); font-family: 'Plus Jakarta Sans', sans-serif; }
 
 body { 
     background: var(--bg); 
     color: var(--text); 
     overflow-x: hidden;
+    line-height: 1.5;
 }
 
+/* Scrollbar Personalizada */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ================== NAVBAR ================== */
 .navbar {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 1rem 5%; background: rgba(11, 15, 26, 0.85);
-    backdrop-filter: blur(15px); border-bottom: 1px solid var(--border);
+    padding: 1rem 5%; background: var(--bg-glass);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border-light);
     position: sticky; top: 0; z-index: 1000; gap: 1rem;
+    box-shadow: var(--shadow-sm);
 }
 
-.logo { font-weight: 800; font-size: 1.5rem; color: white; cursor: pointer; }
+.logo { font-weight: 800; font-size: 1.6rem; color: white; cursor: pointer; letter-spacing: -0.5px; }
 .logo span { color: var(--primary); }
 
-.search-box { flex-grow: 1; max-width: 400px; }
-.search-box input { width: 100%; padding: 10px 15px; border-radius: 99px; margin: 0; }
+.search-box { flex-grow: 1; max-width: 450px; position: relative; }
+.search-box input { 
+    width: 100%; padding: 12px 20px; border-radius: 99px; margin: 0; 
+    background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border);
+    color: var(--text); font-size: 0.95rem;
+}
+.search-box input:focus {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px var(--primary-glow);
+}
 
 .nav-right { display: flex; align-items: center; gap: 15px; }
-.karma-badge { background: rgba(45, 212, 191, 0.1); color: var(--primary); padding: 8px 15px; border-radius: 99px; font-weight: 600; font-size: 0.9rem; border: 1px solid rgba(45, 212, 191, 0.3); }
+.karma-badge { 
+    background: var(--primary-glow); color: var(--primary); 
+    padding: 8px 16px; border-radius: 99px; font-weight: 700; font-size: 0.9rem; 
+    border: 1px solid rgba(45, 212, 191, 0.4);
+    box-shadow: inset 0 0 10px var(--primary-glow);
+}
 
-#mapaPrincipal { width: 100%; height: 450px; border-radius: var(--radius); border: 1px solid var(--border); z-index: 1; }
-#mapaPost { width: 100%; height: 200px; border-radius: 10px; margin: 10px 0; z-index: 1; border: 1px solid var(--border); }
+/* ================== HERO & MAPA ================== */
+.hero { text-align: center; padding: 60px 20px 40px; }
+.hero h1 { font-size: 3rem; margin-bottom: 15px; font-weight: 800; letter-spacing: -1px; }
+.hero h1 span { 
+    background: linear-gradient(135deg, #2dd4bf 0%, #3b82f6 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.hero p { color: var(--text-muted); font-size: 1.15rem; max-width: 600px; margin: 0 auto; }
 
-.btn-gps { position: absolute; top: 15px; right: 6%; z-index: 400; background: var(--card); color: var(--text); border: 1px solid var(--border); padding: 8px 15px; border-radius: 8px; cursor: pointer; font-weight: 600; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-.btn-gps:hover { background: var(--primary); color: var(--bg); }
+#mapaPrincipal { width: 100%; height: 500px; border-radius: var(--radius); border: 1px solid var(--border); z-index: 1; box-shadow: var(--shadow-md); }
+#mapaPost { width: 100%; height: 200px; border-radius: 12px; margin: 10px 0; z-index: 1; border: 1px solid var(--border); }
 
-.hero { text-align: center; padding: 50px 20px 30px; }
-.hero h1 { font-size: 2.5rem; margin-bottom: 10px; }
-.hero h1 span { color: var(--primary); }
-.hero p { color: var(--text-muted); font-size: 1.1rem; }
+.btn-gps { 
+    position: absolute; top: 20px; right: 6%; z-index: 400; 
+    background: var(--card); color: var(--text); border: 1px solid var(--border); 
+    padding: 10px 18px; border-radius: 99px; cursor: pointer; font-weight: 600; 
+    box-shadow: var(--shadow-md); display: flex; align-items: center; gap: 8px;
+}
+.btn-gps:hover { background: var(--primary); color: var(--bg); border-color: var(--primary); transform: translateY(-2px); box-shadow: 0 6px 15px var(--primary-glow); }
+.btn-gps:active { transform: translateY(0); }
 
-.filter-bar { display: flex; gap: 10px; justify-content: center; margin: 20px 0 40px; overflow-x: auto; padding: 0 20px; }
-.filter-btn { background: var(--card); color: var(--text); border: 1px solid var(--border); padding: 8px 20px; border-radius: 99px; cursor: pointer; font-weight: 600; white-space: nowrap; }
-.filter-btn.active, .filter-btn:hover { background: var(--primary); color: var(--bg); border-color: var(--primary); }
+/* ================== FILTROS E CARDS ================== */
+.filter-bar { display: flex; gap: 12px; justify-content: center; margin: 10px 0 40px; overflow-x: auto; padding: 10px 20px; }
+.filter-bar::-webkit-scrollbar { display: none; } /* Oculta scrollbar nos filtros */
+.filter-btn { 
+    background: rgba(255,255,255,0.03); color: var(--text-muted); border: 1px solid var(--border); 
+    padding: 10px 24px; border-radius: 99px; cursor: pointer; font-weight: 600; white-space: nowrap; 
+}
+.filter-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); transform: translateY(-2px); }
+.filter-btn.active { background: var(--primary); color: var(--bg); border-color: var(--primary); box-shadow: 0 4px 15px var(--primary-glow); transform: translateY(-2px); }
 
-.grid-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px; padding: 0 5% 50px; }
-.card { background: var(--card); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); display: flex; flex-direction: column; }
-.card img { width: 100%; height: 200px; object-fit: cover; }
-.card-content { padding: 20px; display: flex; flex-direction: column; flex-grow: 1; }
-.card-content small { color: var(--primary); font-weight: 600; margin-bottom: 5px; }
-.card-content h3 { margin-bottom: 15px; font-size: 1.2rem; }
+.grid-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 30px; padding: 0 5% 60px; }
+.card { 
+    background: var(--card); border-radius: var(--radius); overflow: hidden; 
+    border: 1px solid var(--border-light); display: flex; flex-direction: column; 
+    box-shadow: var(--shadow-md); position: relative;
+}
+.card:hover { transform: translateY(-8px); border-color: var(--primary); box-shadow: 0 15px 30px rgba(0,0,0,0.6), 0 0 15px var(--primary-glow); }
+.card img { width: 100%; height: 220px; object-fit: cover; border-bottom: 1px solid var(--border-light); }
+.card-content { padding: 25px; display: flex; flex-direction: column; flex-grow: 1; }
+.card-content small { 
+    color: var(--primary); font-weight: 700; margin-bottom: 8px; font-size: 0.85rem; 
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+.card-content h3 { margin-bottom: 20px; font-size: 1.3rem; color: var(--text); font-weight: 700; line-height: 1.3; }
 .card-content .btn-save { margin-top: auto; }
 
-.modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 2000; align-items: center; justify-content: center; backdrop-filter: blur(8px); padding: 20px; }
-.modal-content { background: var(--card); padding: 30px; border-radius: 24px; width: 100%; max-width: 450px; border: 1px solid var(--border); max-height: 90vh; overflow-y: auto; }
+/* ================== MODAIS ================== */
+.modal { 
+    display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); 
+    z-index: 2000; align-items: center; justify-content: center; 
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); padding: 20px; 
+}
+.modal-content { 
+    background: var(--card); padding: 35px; border-radius: 24px; width: 100%; max-width: 480px; 
+    border: 1px solid var(--border-light); max-height: 90vh; overflow-y: auto; 
+    box-shadow: var(--shadow-lg); position: relative; animation: modalIn 0.3s ease-out forwards;
+}
 
-.upload-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; margin-bottom: 15px; background: rgba(0,0,0,0.2); color: var(--text-muted); }
-.upload-zone:hover { border-color: var(--primary); color: var(--primary); }
+@keyframes modalIn {
+    from { opacity: 0; transform: scale(0.95) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
 
-input, select, textarea { width: 100%; padding: 14px; margin: 8px 0; border-radius: 10px; background: rgba(0,0,0,0.3); border: 1px solid var(--border); color: white; outline: none; }
-input:focus, select:focus, textarea:focus { border-color: var(--primary); }
-textarea { resize: vertical; min-height: 80px; }
+/* ================== FORMULÁRIOS & INPUTS ================== */
+.upload-zone { 
+    border: 2px dashed var(--border); border-radius: 16px; padding: 40px 20px; 
+    text-align: center; cursor: pointer; margin-bottom: 20px; background: rgba(0,0,0,0.2); 
+    color: var(--text-muted); font-weight: 600;
+}
+.upload-zone:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-glow); }
 
-.btn-post { background: var(--card); border: 1px solid var(--primary); color: var(--primary); font-weight: bold; padding: 10px 20px; border-radius: 99px; cursor: pointer; }
-.btn-post:hover { background: var(--primary); color: var(--bg); }
+input, select, textarea { 
+    width: 100%; padding: 14px 18px; margin: 8px 0; border-radius: 12px; 
+    background: rgba(0,0,0,0.25); border: 1px solid var(--border); color: white; outline: none; 
+    font-size: 1rem;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-glow); background: rgba(0,0,0,0.4); }
+textarea { resize: vertical; min-height: 100px; }
 
-.btn-save { background: var(--primary); color: var(--bg); font-weight: bold; padding: 14px; border-radius: 10px; border: none; cursor: pointer; width: 100%; margin-top: 10px; font-size: 1rem; }
-.btn-save:hover { background: var(--primary-hover); transform: translateY(-2px); }
-.btn-cancel { background: transparent; color: var(--text-muted); border: none; padding: 12px; width: 100%; cursor: pointer; margin-top: 5px; font-weight: 600; }
-.btn-cancel:hover { color: white; }
+/* ================== BOTÕES ================== */
+.btn-post { 
+    background: transparent; border: 2px solid var(--primary); color: var(--primary); 
+    font-weight: 700; padding: 10px 22px; border-radius: 99px; cursor: pointer; 
+}
+.btn-post:hover { background: var(--primary); color: var(--bg); box-shadow: 0 4px 15px var(--primary-glow); transform: translateY(-2px); }
+.btn-post:active { transform: translateY(0); }
 
-/* CHAT STYLES */
-.chat-container { display: flex; flex-direction: column; height: 80vh; padding: 0; overflow: hidden; }
-.chat-header { padding: 20px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; border-radius: 24px 24px 0 0; }
-.chat-messages { flex-grow: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; background: var(--bg); }
-.msg-bubble { max-width: 80%; padding: 12px 16px; border-radius: 16px; font-size: 0.95rem; line-height: 1.4; }
-.msg-mine { background: var(--primary); color: var(--bg); align-self: flex-end; border-bottom-right-radius: 4px; }
-.msg-other { background: var(--card); color: var(--text); border: 1px solid var(--border); align-self: flex-start; border-bottom-left-radius: 4px; }
-.chat-input-area { padding: 15px; display: flex; gap: 10px; background: var(--card); border-top: 1px solid var(--border); border-radius: 0 0 24px 24px; }
-.btn-send { background: var(--primary); color: var(--bg); border: none; border-radius: 50%; width: 45px; height: 45px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+.btn-save { 
+    background: var(--primary); color: var(--bg); font-weight: 800; padding: 16px; 
+    border-radius: 12px; border: none; cursor: pointer; width: 100%; margin-top: 15px; font-size: 1.05rem; 
+    box-shadow: 0 4px 10px rgba(45, 212, 191, 0.3);
+}
+.btn-save:hover { background: var(--primary-hover); transform: translateY(-3px); box-shadow: 0 6px 15px rgba(45, 212, 191, 0.4); }
+.btn-save:active { transform: translateY(-1px); }
+
+.btn-cancel { 
+    background: transparent; color: var(--text-muted); border: none; padding: 14px; 
+    width: 100%; cursor: pointer; margin-top: 5px; font-weight: 700; border-radius: 12px;
+}
+.btn-cancel:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+
+/* ================== CHAT STYLES ================== */
+.chat-container { display: flex; flex-direction: column; height: 85vh; padding: 0; overflow: hidden; }
+.chat-header { 
+    padding: 20px 25px; background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border-light); 
+    display: flex; justify-content: space-between; align-items: center; border-radius: 24px 24px 0 0; 
+}
+.chat-header h4 { font-size: 1.2rem; font-weight: 700; }
+.chat-messages { flex-grow: 1; overflow-y: auto; padding: 25px; display: flex; flex-direction: column; gap: 15px; background: rgba(0,0,0,0.15); }
+.msg-bubble { max-width: 80%; padding: 14px 18px; border-radius: 20px; font-size: 0.95rem; line-height: 1.5; box-shadow: var(--shadow-sm); }
+.msg-mine { 
+    background: var(--primary); color: var(--bg); font-weight: 500;
+    align-self: flex-end; border-bottom-right-radius: 4px; 
+}
+.msg-other { 
+    background: var(--card); color: var(--text); border: 1px solid var(--border-light); 
+    align-self: flex-start; border-bottom-left-radius: 4px; 
+}
+.chat-input-area { 
+    padding: 15px 20px; display: flex; gap: 12px; background: rgba(255,255,255,0.03); 
+    border-top: 1px solid var(--border-light); border-radius: 0 0 24px 24px; align-items: center;
+}
+.chat-input-area input { margin: 0; border-radius: 99px; }
+.btn-send { 
+    background: var(--primary); color: var(--bg); border: none; border-radius: 50%; 
+    min-width: 48px; height: 48px; cursor: pointer; display: flex; align-items: center; 
+    justify-content: center; font-size: 1.2rem; box-shadow: 0 4px 10px var(--primary-glow);
+}
+.btn-send:hover { transform: scale(1.05); background: var(--primary-hover); }
+.btn-send:active { transform: scale(0.95); }
