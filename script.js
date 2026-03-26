@@ -1,6 +1,6 @@
 // --- CONFIGURAÇÃO SUPABASE ---
 const SUPABASE_URL = 'https://ndlpzprccxjpuxqtzrxl.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_...'; // Certifique-se de usar sua chave real
+const SUPABASE_KEY = 'sb_publishable_94q7-RW5thyf7kBRUHDxBw_0bPPvRkX'; // Certifique-se de usar sua chave real
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let itensCadastrados = [];
