@@ -1,14 +1,76 @@
-let mapaPrincipal, mapaPost, markerPost;
-let itensCadastrados = JSON.parse(localStorage.getItem('itensFoundy')) || [];
-let categoriaAtiva = "Todos";
+// --- CONFIGURAÇÃO SUPABASE ---
+const SUPABASE_URL = 'https://ndlpzprccxjpuxqtzrxl.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_94q7-RW5thyf7kBRUHDxBw_0bPPvRkX';
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// --- VARIÁVEIS GLOBAIS ---
+let itensCadastrados = [];
 let currentUser = JSON.parse(localStorage.getItem('foundyUser')) || null;
 let meuKarma = parseInt(localStorage.getItem('foundyKarma')) || 0;
+let categoriaAtiva = "Todos";
+let mapaPrincipal, mapaPost, markerPost;
 
+// --- INICIALIZAÇÃO ---
 window.addEventListener('DOMContentLoaded', () => {
-    initMapaPrincipal();
-    renderizarCards();
+    carregarItens();
     atualizarUI();
 });
+
+// --- SISTEMA DE DADOS ---
+async function carregarItens() {
+    const { data, error } = await supabaseClient
+        .from('itens')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Erro ao buscar dados:', error);
+    } else {
+        itensCadastrados = data;
+        renderizarCards();
+        initMapaPrincipal();
+    }
+}
+
+async function salvarPost() {
+    const titulo = document.getElementById('tituloItem').value;
+    const localRaw = document.getElementById('latLogItem').value;
+    const categoria = document.getElementById('categoriaItem').value;
+    const pergunta = document.getElementById('perguntaSeguranca').value;
+    const foto = document.getElementById('preview').src;
+
+    if (!titulo || !localRaw || categoria === "Outros") {
+        return alert("Preencha o título, categoria e marque o local no mapa!");
+    }
+
+    try {
+        const local = JSON.parse(localRaw);
+        const novoItem = {
+            titulo,
+            categoria,
+            foto,
+            pergunta,
+            lat: local.lat,
+            lng: local.lng,
+            usuario_nome: currentUser ? currentUser.nome : "Anônimo"
+        };
+
+        const { error } = await supabaseClient.from('itens').insert([novoItem]);
+        if (error) throw error;
+
+        alert("Publicado com sucesso! ✨");
+        fecharModalPost();
+        carregarItens();
+    } catch (err) {
+        alert("Erro ao salvar: " + err.message);
+    }
+}
+
+async function excluirPost(id) {
+    if(!confirm("Deseja apagar este item permanentemente?")) return;
+    const { error } = await supabaseClient.from('itens').delete().eq('id', id);
+    if (error) alert("Erro ao excluir."); else carregarItens();
+}
 
 // --- AUTENTICAÇÃO ---
 function abrirModalAuth() { document.getElementById('modalAuth').style.display = 'flex'; }
@@ -17,7 +79,8 @@ function fecharModalAuth() { document.getElementById('modalAuth').style.display 
 function cadastrarOuLogar() {
     const nome = document.getElementById('nomeUser').value;
     const email = document.getElementById('emailUser').value;
-    if(!nome || !email) return alert("Preencha os campos!");
+    if(!nome || !email.includes('@')) return alert("Dados inválidos!");
+    
     currentUser = { nome, email };
     localStorage.setItem('foundyUser', JSON.stringify(currentUser));
     atualizarUI();
@@ -25,8 +88,9 @@ function cadastrarOuLogar() {
 }
 
 function atualizarUI() {
-    if(currentUser) {
-        document.getElementById('authArea').innerHTML = `Olá, <b>${currentUser.nome.split(' ')[0]}</b>`;
+    const authArea = document.getElementById('authArea');
+    if(currentUser && authArea) {
+        authArea.innerHTML = `<span style="color:var(--primary); font-weight:bold;">Olá, ${currentUser.nome.split(' ')[0]}</span>`;
     }
     document.getElementById('valKarma').innerText = meuKarma;
 }
@@ -38,11 +102,11 @@ function initMapaPrincipal() {
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapaPrincipal);
     }
     mapaPrincipal.eachLayer(l => { if (l instanceof L.Marker) mapaPrincipal.removeLayer(l); });
-
+    
     itensCadastrados.forEach(item => {
         if(categoriaAtiva === "Todos" || item.categoria === categoriaAtiva) {
-            L.marker([item.localizacao.lat, item.localizacao.lng]).addTo(mapaPrincipal)
-             .bindPopup(`<b>${item.titulo}</b><br><button onclick="abrirVerificacao(${item.id})">Resgatar</button>`);
+            L.marker([item.lat, item.lng]).addTo(mapaPrincipal)
+             .bindPopup(`<b>${item.titulo}</b><br><button onclick="abrirVerificacao(${item.id})" style="cursor:pointer; border:none; background:var(--primary); color:white; padding:5px; border-radius:5px; margin-top:5px;">Resgatar</button>`);
         }
     });
 }
@@ -51,11 +115,10 @@ function minhaLocalizacao() {
     navigator.geolocation.getCurrentPosition(p => {
         const latlng = [p.coords.latitude, p.coords.longitude];
         mapaPrincipal.setView(latlng, 15);
-        L.circle(latlng, { radius: 200, color: '#2dd4bf' }).addTo(mapaPrincipal);
+        L.marker(latlng).addTo(mapaPrincipal).bindPopup("Você está aqui!").openPopup();
     });
 }
 
-// --- POSTAGEM ---
 function abrirModalPost() {
     if(!currentUser) return abrirModalAuth();
     document.getElementById('modalPost').style.display = 'flex';
@@ -73,68 +136,17 @@ function abrirModalPost() {
     }, 400);
 }
 
+// --- HELPERS ---
 function analisarFoto(e) {
     const reader = new FileReader();
     reader.onload = () => {
-        document.getElementById('preview').src = reader.result;
-        document.getElementById('preview').style.display = 'block';
+        const preview = document.getElementById('preview');
+        preview.src = reader.result;
+        preview.style.display = 'block';
         document.getElementById('uploadPlaceholder').style.display = 'none';
-        document.getElementById('focoInteligente').innerHTML = '<span class="tag-ai">Objeto Identificado</span>';
     };
     reader.readAsDataURL(e.target.files[0]);
 }
-
-function salvarPost() {
-    const titulo = document.getElementById('tituloItem').value;
-    const local = document.getElementById('latLogItem').value;
-    if(!titulo || !local) return alert("Preencha tudo!");
-
-    const novo = {
-        id: Date.now(),
-        titulo,
-        categoria: document.getElementById('categoriaItem').value,
-        localizacao: JSON.parse(local),
-        pergunta: document.getElementById('perguntaSeguranca').value,
-        foto: document.getElementById('preview').src
-    };
-
-    itensCadastrados.unshift(novo);
-    localStorage.setItem('itensFoundy', JSON.stringify(itensCadastrados));
-    meuKarma += 10;
-    localStorage.setItem('foundyKarma', meuKarma);
-    location.reload();
-}
-
-// --- CONVITE E CHAT ---
-let itemAlvo = null;
-function abrirVerificacao(id) {
-    itemAlvo = itensCadastrados.find(i => i.id === id);
-    document.getElementById('perguntaExibida').innerText = itemAlvo.pergunta || "Como é o item?";
-    document.getElementById('modalConvite').style.display = 'flex';
-}
-
-function enviarPedidoChat() {
-    alert("Convite enviado! O achador aceitou (Simulação).");
-    fecharModalConvite();
-    abrirChat();
-}
-
-function abrirChat() {
-    document.getElementById('modalChat').style.display = 'flex';
-    document.getElementById('chatMessages').innerHTML = '<div class="msg other">Olá! Vi sua resposta. Vamos combinar?</div>';
-}
-
-function enviarMensagem() {
-    const val = document.getElementById('msgInput').value;
-    if(!val) return;
-    document.getElementById('chatMessages').innerHTML += `<div class="msg self">${val}</div>`;
-    document.getElementById('msgInput').value = "";
-}
-
-// --- HELPERS ---
-function fecharModalPost() { document.getElementById('modalPost').style.display = 'none'; }
-function fecharModalConvite() { document.getElementById('modalConvite').style.display = 'none'; }
-function fecharChat() { document.getElementById('modalChat').style.display = 'none'; }
 
 function filtrarCategoria(cat) {
     categoriaAtiva = cat;
@@ -149,12 +161,26 @@ function renderizarCards() {
         .filter(i => categoriaAtiva === "Todos" || i.categoria === categoriaAtiva)
         .map(i => `
             <div class="card">
-                <img src="${i.foto || 'https://via.placeholder.com/300'}">
+                <img src="${i.foto || 'https://via.placeholder.com/400x250'}">
                 <div class="card-content">
                     <small style="color:var(--primary)">${i.categoria}</small>
                     <h3>${i.titulo}</h3>
-                    <button class="btn-save" style="margin-top:10px" onclick="abrirVerificacao(${i.id})">Resgatar</button>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <button class="btn-save" style="width:auto; padding:8px 15px;" onclick="abrirVerificacao(${i.id})">Resgatar</button>
+                        <button onclick="excluirPost(${i.id})" style="background:none; border:none; cursor:pointer; font-size:1.2rem;">🗑️</button>
+                    </div>
                 </div>
             </div>
         `).join('');
 }
+
+function abrirVerificacao(id) {
+    const item = itensCadastrados.find(i => i.id === id);
+    document.getElementById('perguntaExibida').innerText = item.pergunta || "Como é o item?";
+    document.getElementById('modalConvite').style.display = 'flex';
+}
+
+function enviarPedidoChat() { alert("Pedido enviado!"); fecharModalConvite(); }
+function fecharModalPost() { document.getElementById('modalPost').style.display = 'none'; }
+function fecharModalConvite() { document.getElementById('modalConvite').style.display = 'none'; }
+function fecharModalAuth() { document.getElementById('modalAuth').style.display = 'none'; }

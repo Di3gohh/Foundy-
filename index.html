@@ -14,11 +14,11 @@
         <div class="nav-left">
             <div class="logo">FOUNDY<span>.</span></div>
             <div id="authArea">
-                <button class="btn-auth" onclick="abrirModalAuth()">Entrar / Criar Conta</button>
+                <button class="btn-post" onclick="abrirModalAuth()">Entrar</button>
             </div>
         </div>
         <div class="search-box">
-            <input type="text" id="inputPesquisa" onkeyup="pesquisarItens()" placeholder="Buscar item ou local...">
+            <input type="text" id="inputPesquisa" placeholder="Buscar item ou local...">
         </div>
         <div class="nav-right">
             <div id="karmaDisplay" class="karma-badge">✨ Karma: <span id="valKarma">0</span></div>
@@ -26,7 +26,7 @@
         </div>
     </nav>
 
-    <main class="container">
+    <main>
         <header class="hero">
             <h1>O que se perdeu, <span>volta.</span></h1>
             <p>A tecnologia Bumerangue conectando comunidades.</p>
@@ -41,7 +41,7 @@
         </div>
 
         <section class="map-section">
-            <div class="map-container-main">
+            <div style="position: relative;">
                 <button class="btn-gps" onclick="minhaLocalizacao()">📍 Onde estou?</button>
                 <div id="mapaPrincipal"></div>
             </div>
@@ -69,6 +69,7 @@
             </div>
             <input type="file" id="fotoItem" accept="image/*" onchange="analisarFoto(event)" style="display:none">
             <div id="focoInteligente" class="ai-tags"></div>
+            
             <input type="text" id="tituloItem" placeholder="Título do item">
             <select id="categoriaItem">
                 <option value="Outros">Categoria...</option>
@@ -77,13 +78,14 @@
                 <option value="Eletrônicos">Eletrônicos</option>
                 <option value="Pets">Pets</option>
             </select>
+            
             <div id="mapaPost"></div>
             <input type="hidden" id="latLogItem">
+            
             <input type="text" id="perguntaSeguranca" placeholder="Pergunta de posse (ex: Qual a marca?)">
-            <div class="modal-actions">
-                <button class="btn-save" onclick="salvarPost()">Publicar</button>
-                <button class="btn-cancel" onclick="fecharModalPost()">Cancelar</button>
-            </div>
+            
+            <button class="btn-save" onclick="salvarPost()">Publicar</button>
+            <button class="btn-cancel" onclick="fecharModalPost()">Cancelar</button>
         </div>
     </div>
 
@@ -91,30 +93,15 @@
         <div class="modal-content">
             <h3>Enviar Pedido de Resgate</h3>
             <p>Responda à pergunta do achador:</p>
-            <blockquote id="perguntaExibida"></blockquote>
+            <blockquote id="perguntaExibida" style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; margin: 10px 0;"></blockquote>
             <textarea id="respostaConvite" placeholder="Sua resposta detalhada..."></textarea>
-            <div class="modal-actions">
-                <button class="btn-save" onclick="enviarPedidoChat()">Enviar Convite</button>
-                <button class="btn-cancel" onclick="fecharModalConvite()">Cancelar</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="modalChat" class="modal">
-        <div class="modal-content">
-            <div class="chat-header">
-                <h4 id="chatTitle">Conversa</h4>
-                <button onclick="fecharChat()">×</button>
-            </div>
-            <div id="chatMessages" class="chat-messages"></div>
-            <div class="chat-input">
-                <input type="text" id="msgInput" placeholder="Sua mensagem...">
-                <button onclick="enviarMensagem()">➡️</button>
-            </div>
+            <button class="btn-save" onclick="enviarPedidoChat()">Enviar Convite</button>
+            <button class="btn-cancel" onclick="fecharModalConvite()">Cancelar</button>
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="script.js"></script>
 </body>
 </html>
