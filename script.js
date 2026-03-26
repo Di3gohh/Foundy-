@@ -1,6 +1,6 @@
 // --- CONFIGURAÇÃO SUPABASE ---
 const SUPABASE_URL = 'https://ndlpzprccxjpuxqtzrxl.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_...'; // Use sua chave real aqui
+const SUPABASE_KEY = 'sb_publishable_...'; // Certifique-se de usar sua chave real
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let itensCadastrados = [];
@@ -9,83 +9,16 @@ let currentItem = null;
 let categoriaAtiva = "Todos";
 let termoBusca = "";
 let mapaPrincipal, mapaPost, markerPost;
-let isLoginMode = false; // Começa como cadastro por padrão no seu HTML antigo
-
-window.addEventListener('DOMContentLoaded', async () => {
-    // Verificar sessão
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    currentUser = user;
-    
-    await carregarItens();
-    atualizarUI();
-    if(currentUser) calcularKarma();
-});
-
-async function carregarItens() {
-    const { data, error } = await supabaseClient.from('itens').select('*').order('created_at', { ascending: false });
-    if (!error) {
-        itensCadastrados = data;
-        renderizarCards();
-        initMapaPrincipal();
-    }
-}
-
-function renderizarCards() {
-    const grid = document.getElementById('itemGrid');
-    const itens = itensFiltrados();
-    grid.innerHTML = itens.length ? "" : `<p style="grid-column:1/-1; text-align:center;">Nenhum item encontrado.</p>`;
-    
-    itens.forEach(item => {
-        grid.innerHTML += `
-            <div class="card">
-                <img src="${item.foto || 'https://via.placeholder.com/300'}" alt="${item.titulo}">
-                <div class="card-content">
-                    <small>${item.categoria}</small>
-                    <h3>${item.titulo}</h3>
-                    <button class="btn-save" onclick="abrirVerificacao(${item.id})">Reivindicar</button>
-                </div>
-            </div>`;
-    });
-}
-
-function toggleAuthMode() {
-    isLoginMode = !isLoginMode;
-    document.getElementById('authTitle').innerText = isLoginMode ? "Entrar na Conta" : "Criar Conta Foundy";
-    document.getElementById('camposCadastroAdicionais').style.display = isLoginMode ? "none" : "block";
-    document.getElementById('btnAuthSubmit').innerText = isLoginMode ? "Entrar" : "Cadastrar";
-    document.getElementById('toggleAuth').innerText = isLoginMode ? "Não tem conta? Cadastrar" : "Já tem conta? Entrar";
-}
-
-async function handleSignUp() {
-    const email = document.getElementById('regEmail').value;
-    const password = document.getElementById('regPass').value;
-
-    if (isLoginMode) {
-        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-        if (error) return alert("Erro: " + error.message);
-        window.location.reload();
-    } else {
-        const fullName = document.getElementById('regNome').value;
-        const cpf = document.getElementById('regCpf').value;
-        if(!fullName || !cpf) return alert("Preencha nome e CPF.");
-
-        const { error } = await supabaseClient.auth.signUp({
-            email, password,
-            options: { data: { full_name: fullName, cpf: cpf } }
-        });
-        if (error) return alert(error.message);
-        alert("Sucesso! Verifique seu e-mail.");
-    }
-}
-
-// Funções de Mapa e Modais seguem a lógica que você criou, 
-// apenas certifique-se de que os IDs batem com o novo HTML.
+let isLoginMode = false;
+let canalChat = null;
 
 // --- INICIALIZAÇÃO ---
 window.addEventListener('DOMContentLoaded', async () => {
-    const { data } = await supabaseClient.auth.getUser();
-    currentUser = data?.user;
+    // 1. Verificar sessão do usuário
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    currentUser = user;
     
+    // 2. Carregar dados iniciais
     await carregarItens();
     atualizarUI();
     if(currentUser) calcularKarma();
@@ -107,202 +40,53 @@ async function carregarItens() {
     }
 }
 
-async function salvarPost() {
-    if(!currentUser) return abrirModalAuth();
+function renderizarCards() {
+    const grid = document.getElementById('itemGrid');
+    const itens = itensFiltrados();
     
-    const titulo = document.getElementById('tituloItem').value;
-    const localRaw = document.getElementById('latLogItem').value;
-    const categoria = document.getElementById('categoriaItem').value;
-    const pergunta = document.getElementById('perguntaSeguranca').value;
-    const foto = document.getElementById('preview').src;
-
-    if (!titulo || !localRaw || categoria === "Outros" || !pergunta) {
-        return alert("Por favor, preencha todos os campos obrigatórios.");
+    if(itens.length === 0) {
+        grid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 40px;">Nenhum item encontrado.</p>`;
+        return;
     }
 
-    try {
-        // Desativar botão para evitar duplo clique
-        const btn = document.querySelector('#modalPost .btn-save');
-        btn.innerText = "Publicando...";
-        btn.disabled = true;
-
-        const local = JSON.parse(localRaw);
-        const { error } = await supabaseClient.from('itens').insert([{
-            titulo, categoria, foto, pergunta,
-            lat: local.lat, lng: local.lng,
-            user_id: currentUser.id,
-            usuario_nome: currentUser.user_metadata.full_name || "Usuário"
-        }]);
-
-        if (error) throw error;
-        alert("Item publicado com sucesso! Você ganhou +10 de Karma ✨");
-        calcularKarma(); // Atualiza o karma imediatamente
-        fecharModalPost();
-        
-        // Limpar formulário
-        document.getElementById('tituloItem').value = '';
-        document.getElementById('perguntaSeguranca').value = '';
-        document.getElementById('preview').style.display = 'none';
-        document.getElementById('uploadPlaceholder').style.display = 'block';
-        
-        await carregarItens();
-    } catch (err) { 
-        alert(err.message); 
-    } finally {
-        const btn = document.querySelector('#modalPost .btn-save');
-        btn.innerText = "Publicar Item & Ganhar Karma ✨";
-        btn.disabled = false;
-    }
+    grid.innerHTML = itens.map(i => `
+        <div class="card">
+            <img src="${i.foto || 'https://via.placeholder.com/400x250?text=Sem+Foto'}" loading="lazy" alt="${i.titulo}">
+            <div class="card-content">
+                <small>${i.categoria}</small>
+                <h3>${i.titulo}</h3>
+                <button class="btn-save" onclick="abrirVerificacao(${i.id})">
+                    ${currentUser && i.user_id === currentUser.id ? 'Ver Conversas' : 'É meu! (Reivindicar)'}
+                </button>
+            </div>
+        </div>
+    `).join('');
 }
 
-// --- PESQUISA E FILTROS ---
-function buscarItens() {
-    termoBusca = document.getElementById('inputPesquisa').value.toLowerCase();
-    renderizarCards();
-    initMapaPrincipal(); // Re-renderiza o mapa baseado na busca
-}
-
-function filtrarCategoria(cat) {
-    categoriaAtiva = cat;
-    // Atualiza visual dos botões
-    document.querySelectorAll('.filter-btn').forEach(btn => {
-        btn.classList.remove('active');
-        if(btn.innerText.includes(cat)) btn.classList.add('active');
-    });
-    renderizarCards();
-    initMapaPrincipal();
-}
-
-function itensFiltrados() {
-    return itensCadastrados.filter(i => {
-        const matchCategoria = categoriaAtiva === "Todos" || i.categoria === categoriaAtiva;
-        const matchBusca = i.titulo.toLowerCase().includes(termoBusca) || i.categoria.toLowerCase().includes(termoBusca);
-        return matchCategoria && matchBusca;
-    });
-}
-
-// --- AUTENTICAÇÃO E VALIDAÇÕES ---
-
-function toggleAuthMode() {
-    isLoginMode = !isLoginMode;
-    
-    // Atualiza os textos do modal com base no estado (Login ou Cadastro)
-    document.getElementById('authTitle').innerText = isLoginMode ? "Entrar na Conta" : "Criar Conta Foundy";
-    document.getElementById('btnAuthSubmit').innerText = isLoginMode ? "Entrar" : "Cadastrar";
-    document.getElementById('toggleAuth').innerText = isLoginMode ? "Não tem conta? Cadastrar" : "Já tem conta? Entrar";
-    
-    // Mostra ou esconde os campos extras de cadastro
-    document.getElementById('camposCadastroAdicionais').style.display = isLoginMode ? "none" : "block";
-}
-
-function verificarIdade() {
-    const dataNasc = document.getElementById('regDataNasc').value;
-    if(!dataNasc) return;
-    
-    const hoje = new Date();
-    const nascimento = new Date(dataNasc);
-    let idade = hoje.getFullYear() - nascimento.getFullYear();
-    const m = hoje.getMonth() - nascimento.getMonth();
-    
-    if (m < 0 || (m === 0 && hoje.getDate() < nascimento.getDate())) {
-        idade--;
-    }
-    
-    const divResp = document.getElementById('authResponsavel');
-    if(idade < 18) {
-        divResp.style.display = "block";
-    } else {
-        divResp.style.display = "none";
-        document.getElementById('checkResponsavel').checked = false;
-    }
-}
-
-async function handleSignUp() {
-    const email = document.getElementById('regEmail').value;
-    const password = document.getElementById('regPass').value;
-    const btnSubmit = document.getElementById('btnAuthSubmit');
-    
-    if (!email || !password) return alert("Por favor, preencha E-mail e Senha.");
-
-    // Feedback visual de carregamento
-    btnSubmit.innerText = "Aguarde...";
-    btnSubmit.disabled = true;
-    
-    try {
-        if (isLoginMode) {
-            // LÓGICA DE LOGIN
-            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) throw error;
-            
-            window.location.reload(); // Recarrega para atualizar a interface com o usuário logado
-            
-        } else {
-            // LÓGICA DE CADASTRO
-            const fullName = document.getElementById('regNome').value;
-            const phone = document.getElementById('regPhone').value;
-            const cpf = document.getElementById('regCpf').value;
-            const dataNasc = document.getElementById('regDataNasc').value;
-            
-            if(!fullName || !cpf) return alert("Preencha seu Nome e CPF.");
-
-            // Validação de Menores
-            const divRespVisivel = document.getElementById('authResponsavel').style.display === 'block';
-            const checkboxResponsavel = document.getElementById('checkResponsavel').checked;
-            
-            if (divRespVisivel && !checkboxResponsavel) {
-                btnSubmit.innerText = "Cadastrar";
-                btnSubmit.disabled = false;
-                return alert("Como você é menor de idade, precisamos da confirmação de que possui autorização do seu responsável.");
-            }
-
-            const { error } = await supabaseClient.auth.signUp({
-                email, 
-                password,
-                options: { 
-                    data: { 
-                        full_name: fullName, 
-                        phone: phone,
-                        cpf: cpf, 
-                        data_nascimento: dataNasc
-                    } 
-                }
-            });
-            
-            if (error) throw error;
-            
-            alert("Conta criada com sucesso! Verifique seu e-mail para confirmar a conta ou faça login.");
-            toggleAuthMode(); // Muda para a tela de login automaticamente após cadastrar
-        }
-    } catch (err) {
-        alert("Erro: " + err.message);
-    } finally {
-        // Restaura o botão
-        btnSubmit.innerText = isLoginMode ? "Entrar" : "Cadastrar";
-        btnSubmit.disabled = false;
-    }
-}
-// --- MAPAS ---
+// --- MAPAS (CORRIGIDOS) ---
 function initMapaPrincipal() {
     if (!mapaPrincipal) {
         mapaPrincipal = L.map('mapaPrincipal').setView([-23.55, -46.63], 13);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap &copy; CARTO'
+            attribution: '&copy; OpenStreetMap'
         }).addTo(mapaPrincipal);
     }
     
-    // Limpar marcadores antigos
+    // Limpa marcadores para não duplicar no filtro
     mapaPrincipal.eachLayer(l => { if (l instanceof L.Marker) mapaPrincipal.removeLayer(l); });
     
     const itens = itensFiltrados();
     itens.forEach(item => {
-        L.marker([item.lat, item.lng]).addTo(mapaPrincipal)
-         .bindPopup(`
-            <div style="text-align:center;">
-                <b style="font-family:'Plus Jakarta Sans';">${item.titulo}</b><br>
-                <small style="color:gray;">${item.categoria}</small><br>
-                <button style="background:#2dd4bf; border:none; padding:5px 10px; border-radius:5px; color:#0b0f1a; font-weight:bold; margin-top:8px; cursor:pointer;" onclick="abrirVerificacao(${item.id})">Reivindicar Item</button>
-            </div>
-         `);
+        if (item.lat && item.lng) {
+            L.marker([item.lat, item.lng]).addTo(mapaPrincipal)
+             .bindPopup(`
+                <div style="text-align:center; font-family:'Plus Jakarta Sans';">
+                    <b>${item.titulo}</b><br>
+                    <small>${item.categoria}</small><br>
+                    <button class="btn-save" style="padding: 5px 10px; font-size: 12px;" onclick="abrirVerificacao(${item.id})">Ver Item</button>
+                </div>
+             `);
+        }
     });
 }
 
@@ -311,28 +95,67 @@ function minhaLocalizacao() {
         navigator.geolocation.getCurrentPosition(p => {
             const latlng = [p.coords.latitude, p.coords.longitude];
             mapaPrincipal.setView(latlng, 15);
-        }, () => alert("Ative a localização no seu navegador."));
+        }, () => alert("Ative a localização no navegador."));
     }
 }
 
-// --- CHAT E RESGATE ---
+// --- AUTENTICAÇÃO (UNIFICADA) ---
+function toggleAuthMode() {
+    isLoginMode = !isLoginMode;
+    document.getElementById('authTitle').innerText = isLoginMode ? "Entrar na Conta" : "Criar Conta Foundy";
+    document.getElementById('btnAuthSubmit').innerText = isLoginMode ? "Entrar" : "Cadastrar";
+    document.getElementById('toggleAuth').innerText = isLoginMode ? "Não tem conta? Cadastrar" : "Já tem conta? Entrar";
+    document.getElementById('camposCadastroAdicionais').style.display = isLoginMode ? "none" : "block";
+}
+
+async function handleSignUp() {
+    const email = document.getElementById('regEmail').value;
+    const password = document.getElementById('regPass').value;
+    const btn = document.getElementById('btnAuthSubmit');
+
+    if (!email || !password) return alert("Preencha e-mail e senha.");
+    
+    btn.disabled = true;
+    btn.innerText = "Processando...";
+
+    try {
+        if (isLoginMode) {
+            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) throw error;
+            window.location.reload();
+        } else {
+            const fullName = document.getElementById('regNome').value;
+            const cpf = document.getElementById('regCpf').value;
+            if(!fullName || !cpf) throw new Error("Nome e CPF são obrigatórios.");
+
+            const { error } = await supabaseClient.auth.signUp({
+                email, password,
+                options: { data: { full_name: fullName, cpf: cpf } }
+            });
+            if (error) throw error;
+            alert("Sucesso! Verifique seu e-mail.");
+            toggleAuthMode();
+        }
+    } catch (err) {
+        alert(err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerText = isLoginMode ? "Entrar" : "Cadastrar";
+    }
+}
+
+// --- CHAT EM TEMPO REAL (CORRIGIDO) ---
 async function abrirChatReal(itemId, mensagemInicial = null) {
     if (!currentUser) return abrirModalAuth();
     currentItem = itensCadastrados.find(i => i.id === itemId);
     
     document.getElementById('modalChat').style.display = 'flex';
-    document.getElementById('chatPartner').innerText = `Negociação: ${currentItem.titulo}`;
+    document.getElementById('chatPartner').innerText = `Chat: ${currentItem.titulo}`;
     
     await carregarMensagens(itemId);
 
-    // Se houver mensagem inicial (resposta de segurança), enviar automaticamente
     if(mensagemInicial) {
-        await supabaseClient.from('messages').insert([{
-            content: `🔑 **Resposta de Segurança:** ${mensagemInicial}`,
-            sender_id: currentUser.id,
-            item_id: currentItem.id,
-            receiver_id: currentItem.user_id
-        }]);
+        await enviarMensagemParaBanco(`🔑 **Resposta de Segurança:** ${mensagemInicial}`);
     }
 
     if (canalChat) supabaseClient.removeChannel(canalChat);
@@ -343,12 +166,7 @@ async function abrirChatReal(itemId, mensagemInicial = null) {
 }
 
 async function carregarMensagens(itemId) {
-    const { data: msgs } = await supabaseClient
-        .from('messages')
-        .select('*')
-        .eq('item_id', itemId)
-        .order('created_at', { ascending: true });
-
+    const { data: msgs } = await supabaseClient.from('messages').select('*').eq('item_id', itemId).order('created_at', { ascending: true });
     const chatMessages = document.getElementById('chatMessages');
     chatMessages.innerHTML = '';
     if(msgs) msgs.forEach(m => adicionarMensagemUI(m));
@@ -357,24 +175,22 @@ async function carregarMensagens(itemId) {
 function adicionarMensagemUI(m) {
     const chatMessages = document.getElementById('chatMessages');
     const isMine = m.sender_id === currentUser.id;
-    const classe = isMine ? 'msg-mine' : 'msg-other';
-    
     const div = document.createElement('div');
-    div.className = `msg-bubble ${classe}`;
-    // Substitui quebras de linha e trata markdown básico para a resposta de segurança
+    div.className = `msg-bubble ${isMine ? 'msg-mine' : 'msg-other'}`;
     div.innerHTML = m.content.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>'); 
-    
     chatMessages.appendChild(div);
-    chatMessages.scrollTop = chatMessages.scrollHeight; // Rola para o final
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 async function enviarMensagemReal() {
     const input = document.getElementById('msgInput');
-    if(!input.value.trim()) return;
-    
-    const texto = input.value;
-    input.value = ''; // Limpa rápido para UX
-    
+    const texto = input.value.trim();
+    if(!texto) return;
+    input.value = '';
+    await enviarMensagemParaBanco(texto);
+}
+
+async function enviarMensagemParaBanco(texto) {
     await supabaseClient.from('messages').insert([{
         content: texto,
         sender_id: currentUser.id,
@@ -383,102 +199,121 @@ async function enviarMensagemReal() {
     }]);
 }
 
-// --- AUXILIARES MODAIS ---
-function abrirModalAuth() { document.getElementById('modalAuth').style.display = 'flex'; }
-function fecharModalAuth() { document.getElementById('modalAuth').style.display = 'none'; }
-
+// --- UTILITÁRIOS ---
 function abrirModalPost() { 
     if(!currentUser) return abrirModalAuth();
     document.getElementById('modalPost').style.display = 'flex';
-    
     setTimeout(() => {
         if(!mapaPost) {
             mapaPost = L.map('mapaPost').setView([-23.55, -46.63], 13);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(mapaPost);
-            
-            // Tenta pegar a localização do usuário para o mapa de postagem
-            if ("geolocation" in navigator) {
-                navigator.geolocation.getCurrentPosition(p => {
-                    const latlng = [p.coords.latitude, p.coords.longitude];
-                    mapaPost.setView(latlng, 16);
-                    setMarkerPost(latlng);
-                });
-            }
-
-            mapaPost.on('click', e => setMarkerPost(e.latlng));
+            mapaPost.on('click', e => {
+                if(markerPost) mapaPost.removeLayer(markerPost);
+                markerPost = L.marker(e.latlng).addTo(mapaPost);
+                document.getElementById('latLogItem').value = JSON.stringify(e.latlng);
+            });
         } else {
             mapaPost.invalidateSize();
         }
-    }, 400);
+    }, 300);
 }
 
-function setMarkerPost(latlng) {
-    if(markerPost) mapaPost.removeLayer(markerPost);
-    markerPost = L.marker(latlng).addTo(mapaPost);
-    document.getElementById('latLogItem').value = JSON.stringify(latlng);
+async function salvarPost() {
+    const btn = document.querySelector('#modalPost .btn-save');
+    const titulo = document.getElementById('tituloItem').value;
+    const localRaw = document.getElementById('latLogItem').value;
+    const categoria = document.getElementById('categoriaItem').value;
+    const pergunta = document.getElementById('perguntaSeguranca').value;
+    const foto = document.getElementById('preview').src;
+
+    if (!titulo || !localRaw || !pergunta) return alert("Preencha todos os campos e marque o local no mapa.");
+
+    btn.disabled = true;
+    btn.innerText = "Publicando...";
+
+    const local = JSON.parse(localRaw);
+    const { error } = await supabaseClient.from('itens').insert([{
+        titulo, categoria, foto, pergunta,
+        lat: local.lat, lng: local.lng,
+        user_id: currentUser.id,
+        usuario_nome: currentUser.user_metadata.full_name || "Usuário"
+    }]);
+
+    if (!error) {
+        alert("Publicado! +10 Karma ✨");
+        window.location.reload();
+    } else {
+        alert(error.message);
+        btn.disabled = false;
+        btn.innerText = "Publicar Item";
+    }
 }
 
-function fecharModalPost() { document.getElementById('modalPost').style.display = 'none'; }
+function filtrarCategoria(cat) {
+    categoriaAtiva = cat;
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.innerText.includes(cat));
+    });
+    renderizarCards();
+    initMapaPrincipal();
+}
+
+function itensFiltrados() {
+    return itensCadastrados.filter(i => {
+        const matchCat = categoriaAtiva === "Todos" || i.categoria === categoriaAtiva;
+        const matchBusca = i.titulo.toLowerCase().includes(termoBusca.toLowerCase());
+        return matchCat && matchBusca;
+    });
+}
+
+function buscarItens() {
+    termoBusca = document.getElementById('inputPesquisa').value;
+    renderizarCards();
+    initMapaPrincipal();
+}
 
 function abrirVerificacao(id) {
     if (!currentUser) return abrirModalAuth();
     currentItem = itensCadastrados.find(i => i.id === id);
-    
-    // Se o usuário clicou no próprio item, abre o chat direto
-    if(currentItem.user_id === currentUser.id) {
-        return abrirChatReal(id);
-    }
+    if(currentItem.user_id === currentUser.id) return abrirChatReal(id);
 
-    document.getElementById('perguntaExibida').innerText = currentItem.pergunta || "Descreva detalhes específicos sobre este item.";
-    document.getElementById('respostaConvite').value = '';
+    document.getElementById('perguntaExibida').innerText = currentItem.pergunta;
     document.getElementById('modalConvite').style.display = 'flex';
 }
 
-function fecharModalConvite() { document.getElementById('modalConvite').style.display = 'none'; }
-function fecharChat() { 
-    document.getElementById('modalChat').style.display = 'none'; 
-    if (canalChat) supabaseClient.removeChannel(canalChat);
-}
-
 function enviarPedidoChat() { 
-    const resposta = document.getElementById('respostaConvite').value;
-    if(!resposta.trim()) return alert("Por favor, responda à pergunta para provar que o item é seu.");
-    
+    const resp = document.getElementById('respostaConvite').value;
+    if(!resp) return alert("Responda à pergunta.");
     fecharModalConvite();
-    abrirChatReal(currentItem.id, resposta); 
+    abrirChatReal(currentItem.id, resp); 
 }
 
 function analisarFoto(e) {
-    const file = e.target.files[0];
-    if(!file) return;
-    
     const reader = new FileReader();
     reader.onload = () => {
-        const preview = document.getElementById('preview');
-        preview.src = reader.result;
-        preview.style.display = 'block';
+        const p = document.getElementById('preview');
+        p.src = reader.result; p.style.display = 'block';
         document.getElementById('uploadPlaceholder').style.display = 'none';
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(e.target.files[0]);
 }
 
-function renderizarCards() {
-    const grid = document.getElementById('itemGrid');
-    const itens = itensFiltrados();
-    
-    if(itens.length === 0) {
-        grid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">Nenhum item encontrado nesta categoria.</p>`;
-        return;
+function atualizarUI() {
+    if(currentUser) {
+        const nome = currentUser.user_metadata.full_name?.split(' ')[0] || "Usuário";
+        document.getElementById('authArea').innerHTML = `<span>Olá, <b>${nome}</b></span> <button onclick="sair()" style="margin-left:10px; cursor:pointer; background:none; border:none; color:var(--text-muted);">Sair</button>`;
     }
-
-    grid.innerHTML = itens.map(i => `
-        <div class="card">
-            <img src="${i.foto || 'https://via.placeholder.com/400x250?text=Sem+Foto'}" loading="lazy" alt="Foto de ${i.titulo}">
-            <div class="card-content">
-                <small>${i.categoria}</small>
-                <h3>${i.titulo}</h3>
-                <button class="btn-save" onclick="abrirVerificacao(${i.id})">É meu! (Reivindicar)</button>
-            </div>
-        </div>
-    `).join('');
 }
+
+function calcularKarma() {
+    const meus = itensCadastrados.filter(i => i.user_id === currentUser.id);
+    document.getElementById('valKarma').innerText = meus.length * 10;
+    document.getElementById('karmaDisplay').style.display = 'block';
+}
+
+async function sair() { await supabaseClient.auth.signOut(); window.location.reload(); }
+function fecharModalAuth() { document.getElementById('modalAuth').style.display = 'none'; }
+function fecharModalPost() { document.getElementById('modalPost').style.display = 'none'; }
+function fecharModalConvite() { document.getElementById('modalConvite').style.display = 'none'; }
+function fecharChat() { document.getElementById('modalChat').style.display = 'none'; }
+function abrirModalAuth() { document.getElementById('modalAuth').style.display = 'flex'; }
