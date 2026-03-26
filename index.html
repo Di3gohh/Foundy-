@@ -56,23 +56,23 @@
             <div id="authForm">
                 <div id="stepRequest">
                     <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px;">
-                        Digite seu número com o código do país e DDD para receber o token de acesso.
+                        Digite seu e-mail para receber um código de acesso instantâneo.
                     </p>
-                    <input type="tel" id="authPhone" placeholder="Ex: +5511999999999">
-                    <input type="text" id="authName" placeholder="Seu Nome Completo (Apenas para novos cadastros)" style="display:none;">
+                    <input type="email" id="authEmail" placeholder="seu@email.com">
+                    <input type="text" id="authName" placeholder="Seu Nome Completo (Para novos cadastros)" style="display:none;">
                     
-                    <button class="btn-save" id="btnSendToken" onclick="enviarToken()">Enviar Código por SMS</button>
+                    <button class="btn-save" id="btnSendToken" onclick="enviarToken()">Receber Código por E-mail</button>
                     <p id="toggleAuth" onclick="toggleAuthMode()" style="cursor:pointer; font-size: 0.85rem; text-align:center; margin-top:15px; color: var(--primary);">Novo por aqui? Criar conta</p>
                 </div>
 
                 <div id="stepVerify" style="display:none;">
                     <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px;">
-                        Enviamos um código de 6 dígitos para o seu número.
+                        Enviamos um código de 6 dígitos para o seu e-mail.
                     </p>
-                    <input type="text" id="authToken" placeholder="Código de 6 dígitos (Ex: 123456)" maxlength="6" style="text-align: center; font-size: 1.2rem; letter-spacing: 5px;">
+                    <input type="text" id="authToken" placeholder="Digite o código" maxlength="6" style="text-align: center; font-size: 1.2rem; letter-spacing: 5px;">
                     
                     <button class="btn-save" id="btnVerifyToken" onclick="verificarToken()">Verificar e Entrar</button>
-                    <button class="btn-cancel" onclick="voltarStepAuth()">Tentar outro número</button>
+                    <button class="btn-cancel" onclick="voltarStepAuth()">Usar outro e-mail</button>
                 </div>
             </div>
             
@@ -98,11 +98,11 @@
                 <option value="Pets">Pets</option>
             </select>
             
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 10px;">Marque no mapa onde você encontrou (aproxime para mais precisão):</p>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 10px;">Marque no mapa onde você encontrou:</p>
             <div id="mapaPost"></div>
             <input type="hidden" id="latLogItem">
             
-            <input type="text" id="perguntaSeguranca" placeholder="Pergunta de segurança (ex: Qual a foto da tela de bloqueio?)">
+            <input type="text" id="perguntaSeguranca" placeholder="Pergunta de segurança (ex: Qual a cor da capinha?)">
             
             <button class="btn-save" onclick="salvarPost()">Publicar Item & Ganhar Karma ✨</button>
             <button class="btn-cancel" onclick="fecharModalPost()">Cancelar</button>
@@ -112,10 +112,10 @@
     <div id="modalConvite" class="modal">
         <div class="modal-content">
             <h3>Solicitar Resgate</h3>
-            <p style="font-size: 0.9rem; color: var(--text-muted);">Para provar que o item é seu, responda à pergunta de segurança criada por quem achou:</p>
+            <p style="font-size: 0.9rem; color: var(--text-muted);">Responda à pergunta de segurança para abrir o chat:</p>
             <blockquote id="perguntaExibida" style="background: rgba(45, 212, 191, 0.1); border-left: 4px solid var(--primary); padding: 10px; border-radius: 0 8px 8px 0; margin: 15px 0; font-style: italic;"></blockquote>
-            <textarea id="respostaConvite" placeholder="Sua resposta detalhada... Seja o mais específico possível."></textarea>
-            <button class="btn-save" onclick="enviarPedidoChat()">Enviar Resposta para Análise</button>
+            <textarea id="respostaConvite" placeholder="Sua resposta detalhada..."></textarea>
+            <button class="btn-save" onclick="enviarPedidoChat()">Enviar Resposta</button>
             <button class="btn-cancel" onclick="fecharModalConvite()">Cancelar</button>
         </div>
     </div>
@@ -126,9 +126,10 @@
                 <h4 id="chatPartner">Conversa Segura</h4>
                 <button onclick="fecharChat()" style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;">&times;</button>
             </div>
-            <div id="chatMessages" class="chat-messages"></div>
+            <div id="chatMessages" class="chat-messages">
+                </div>
             <div class="chat-input-area">
-                <input type="text" id="msgInput" placeholder="Combine o local de entrega...">
+                <input type="text" id="msgInput" placeholder="Digite uma mensagem...">
                 <button onclick="enviarMensagemReal()" class="btn-send">➤</button>
             </div>
         </div>
