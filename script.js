@@ -5,13 +5,17 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // --- VARIÁVEIS GLOBAIS ---
 let itensCadastrados = [];
-let currentUser = JSON.parse(localStorage.getItem('foundyUser')) || null;
-let meuKarma = parseInt(localStorage.getItem('foundyKarma')) || 0;
+let currentUser = null;
+let currentItem = null; // Item selecionado para chat
 let categoriaAtiva = "Todos";
 let mapaPrincipal, mapaPost, markerPost;
+let isLoginMode = false;
 
 // --- INICIALIZAÇÃO ---
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
+    const { data } = await supabaseClient.auth.getUser();
+    currentUser = data?.user;
+    
     carregarItens();
     atualizarUI();
 });
@@ -23,9 +27,7 @@ async function carregarItens() {
         .select('*')
         .order('created_at', { ascending: false });
 
-    if (error) {
-        console.error('Erro ao buscar dados:', error);
-    } else {
+    if (!error) {
         itensCadastrados = data;
         renderizarCards();
         initMapaPrincipal();
@@ -33,66 +35,66 @@ async function carregarItens() {
 }
 
 async function salvarPost() {
+    if(!currentUser) return abrirModalAuth();
+    
     const titulo = document.getElementById('tituloItem').value;
     const localRaw = document.getElementById('latLogItem').value;
     const categoria = document.getElementById('categoriaItem').value;
     const pergunta = document.getElementById('perguntaSeguranca').value;
     const foto = document.getElementById('preview').src;
 
-    if (!titulo || !localRaw || categoria === "Outros") {
-        return alert("Preencha o título, categoria e marque o local no mapa!");
-    }
+    if (!titulo || !localRaw || categoria === "Outros") return alert("Preencha todos os campos!");
 
     try {
         const local = JSON.parse(localRaw);
-        const novoItem = {
-            titulo,
-            categoria,
-            foto,
-            pergunta,
-            lat: local.lat,
-            lng: local.lng,
-            usuario_nome: currentUser ? currentUser.nome : "Anônimo"
-        };
+        const { error } = await supabaseClient.from('itens').insert([{
+            titulo, categoria, foto, pergunta,
+            lat: local.lat, lng: local.lng,
+            user_id: currentUser.id,
+            usuario_nome: currentUser.user_metadata.full_name || "Usuário"
+        }]);
 
-        const { error } = await supabaseClient.from('itens').insert([novoItem]);
         if (error) throw error;
-
         alert("Publicado com sucesso! ✨");
         fecharModalPost();
         carregarItens();
-    } catch (err) {
-        alert("Erro ao salvar: " + err.message);
-    }
+    } catch (err) { alert(err.message); }
 }
 
-async function excluirPost(id) {
-    if(!confirm("Deseja apagar este item permanentemente?")) return;
-    const { error } = await supabaseClient.from('itens').delete().eq('id', id);
-    if (error) alert("Erro ao excluir."); else carregarItens();
+// --- AUTENTICAÇÃO REAL ---
+function toggleAuthMode() {
+    isLoginMode = !isLoginMode;
+    document.getElementById('authTitle').innerText = isLoginMode ? "Entrar" : "Criar Conta Real";
+    document.getElementById('regNome').style.display = isLoginMode ? "none" : "block";
+    document.getElementById('regPhone').style.display = isLoginMode ? "none" : "block";
+    document.getElementById('toggleAuth').innerText = isLoginMode ? "Não tem conta? Cadastrar" : "Já tem conta? Entrar";
 }
 
-// --- AUTENTICAÇÃO ---
-function abrirModalAuth() { document.getElementById('modalAuth').style.display = 'flex'; }
-function fecharModalAuth() { document.getElementById('modalAuth').style.display = 'none'; }
-
-function cadastrarOuLogar() {
-    const nome = document.getElementById('nomeUser').value;
-    const email = document.getElementById('emailUser').value;
-    if(!nome || !email.includes('@')) return alert("Dados inválidos!");
+async function handleSignUp() {
+    const email = document.getElementById('regEmail').value;
+    const password = document.getElementById('regPass').value;
     
-    currentUser = { nome, email };
-    localStorage.setItem('foundyUser', JSON.stringify(currentUser));
-    atualizarUI();
-    fecharModalAuth();
+    if (isLoginMode) {
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) return alert(error.message);
+        window.location.reload();
+    } else {
+        const fullName = document.getElementById('regNome').value;
+        const phone = document.getElementById('regPhone').value;
+        const { error } = await supabaseClient.auth.signUp({
+            email, password,
+            options: { data: { full_name: fullName, phone: phone } }
+        });
+        if (error) return alert(error.message);
+        alert("Verifique seu e-mail para confirmar!");
+    }
 }
 
 function atualizarUI() {
     const authArea = document.getElementById('authArea');
-    if(currentUser && authArea) {
-        authArea.innerHTML = `<span style="color:var(--primary); font-weight:bold;">Olá, ${currentUser.nome.split(' ')[0]}</span>`;
+    if(currentUser) {
+        authArea.innerHTML = `<span style="color:var(--primary); font-weight:bold;">Olá, ${currentUser.user_metadata.full_name?.split(' ')[0]}</span>`;
     }
-    document.getElementById('valKarma').innerText = meuKarma;
 }
 
 // --- MAPAS ---
@@ -106,7 +108,7 @@ function initMapaPrincipal() {
     itensCadastrados.forEach(item => {
         if(categoriaAtiva === "Todos" || item.categoria === categoriaAtiva) {
             L.marker([item.lat, item.lng]).addTo(mapaPrincipal)
-             .bindPopup(`<b>${item.titulo}</b><br><button onclick="abrirVerificacao(${item.id})" style="cursor:pointer; border:none; background:var(--primary); color:white; padding:5px; border-radius:5px; margin-top:5px;">Resgatar</button>`);
+             .bindPopup(`<b>${item.titulo}</b><br><button onclick="abrirVerificacao(${item.id})">Resgatar</button>`);
         }
     });
 }
@@ -119,7 +121,47 @@ function minhaLocalizacao() {
     });
 }
 
-function abrirModalPost() {
+// --- CHAT REALTIME ---
+let canalChat = null;
+
+async function abrirChatReal(itemId) {
+    if (!currentUser) return abrirModalAuth();
+    currentItem = itensCadastrados.find(i => i.id === itemId);
+    document.getElementById('modalChat').style.display = 'flex';
+    document.getElementById('chatPartner').innerText = `Falar com: ${currentItem.usuario_nome}`;
+    
+    const { data: msgs } = await supabaseClient
+        .from('messages')
+        .select('*')
+        .eq('item_id', itemId);
+
+    const chatMessages = document.getElementById('chatMessages');
+    chatMessages.innerHTML = msgs ? msgs.map(m => `<div><b>${m.sender_id === currentUser.id ? 'Você' : 'Achador'}:</b> ${m.content}</div>`).join('') : '';
+
+    if (canalChat) supabaseClient.removeChannel(canalChat);
+    canalChat = supabaseClient.channel(`chat-${itemId}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+            chatMessages.innerHTML += `<div><b>Novo:</b> ${payload.new.content}</div>`;
+        }).subscribe();
+}
+
+async function enviarMensagemReal() {
+    const input = document.getElementById('msgInput');
+    if(!input.value) return;
+    
+    await supabaseClient.from('messages').insert([{
+        content: input.value,
+        sender_id: currentUser.id,
+        item_id: currentItem.id,
+        receiver_id: currentItem.user_id
+    }]);
+    input.value = '';
+}
+
+// --- AUXILIARES MODAIS ---
+function abrirModalAuth() { document.getElementById('modalAuth').style.display = 'flex'; }
+function fecharModalAuth() { document.getElementById('modalAuth').style.display = 'none'; }
+function abrirModalPost() { 
     if(!currentUser) return abrirModalAuth();
     document.getElementById('modalPost').style.display = 'flex';
     setTimeout(() => {
@@ -132,11 +174,24 @@ function abrirModalPost() {
                 document.getElementById('latLogItem').value = JSON.stringify(e.latlng);
             });
         }
-        mapaPost.invalidateSize();
     }, 400);
 }
+function fecharModalPost() { document.getElementById('modalPost').style.display = 'none'; }
+function abrirVerificacao(id) {
+    currentItem = itensCadastrados.find(i => i.id === id);
+    document.getElementById('perguntaExibida').innerText = currentItem.pergunta || "Como é o item?";
+    document.getElementById('modalConvite').style.display = 'flex';
+}
+function fecharModalConvite() { document.getElementById('modalConvite').style.display = 'none'; }
+function fecharChat() { document.getElementById('modalChat').style.display = 'none'; }
+function enviarPedidoChat() { abrirChatReal(currentItem.id); fecharModalConvite(); }
 
-// --- HELPERS ---
+function filtrarCategoria(cat) {
+    categoriaAtiva = cat;
+    renderizarCards();
+    initMapaPrincipal();
+}
+
 function analisarFoto(e) {
     const reader = new FileReader();
     reader.onload = () => {
@@ -148,13 +203,6 @@ function analisarFoto(e) {
     reader.readAsDataURL(e.target.files[0]);
 }
 
-function filtrarCategoria(cat) {
-    categoriaAtiva = cat;
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.innerText.includes(cat)));
-    renderizarCards();
-    initMapaPrincipal();
-}
-
 function renderizarCards() {
     const grid = document.getElementById('itemGrid');
     grid.innerHTML = itensCadastrados
@@ -163,24 +211,10 @@ function renderizarCards() {
             <div class="card">
                 <img src="${i.foto || 'https://via.placeholder.com/400x250'}">
                 <div class="card-content">
-                    <small style="color:var(--primary)">${i.categoria}</small>
+                    <small>${i.categoria}</small>
                     <h3>${i.titulo}</h3>
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <button class="btn-save" style="width:auto; padding:8px 15px;" onclick="abrirVerificacao(${i.id})">Resgatar</button>
-                        <button onclick="excluirPost(${i.id})" style="background:none; border:none; cursor:pointer; font-size:1.2rem;">🗑️</button>
-                    </div>
+                    <button class="btn-save" onclick="abrirVerificacao(${i.id})">Resgatar</button>
                 </div>
             </div>
         `).join('');
 }
-
-function abrirVerificacao(id) {
-    const item = itensCadastrados.find(i => i.id === id);
-    document.getElementById('perguntaExibida').innerText = item.pergunta || "Como é o item?";
-    document.getElementById('modalConvite').style.display = 'flex';
-}
-
-function enviarPedidoChat() { alert("Pedido enviado!"); fecharModalConvite(); }
-function fecharModalPost() { document.getElementById('modalPost').style.display = 'none'; }
-function fecharModalConvite() { document.getElementById('modalConvite').style.display = 'none'; }
-function fecharModalAuth() { document.getElementById('modalAuth').style.display = 'none'; }
