@@ -1,159 +1,137 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Foundy | O que se perdeu, volta.</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foundy | O que se perdeu, volta.</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <nav class="navbar">
-<div class="nav-left">
-<div class="logo">FOUNDY<span>.</span></div>
-<div id="authArea">
-<button class="btn-post" onclick="abrirModalAuth()">Entrar</button>
-</div>
-</div>
-<div class="search-box">
-            <input type="text" id="inputPesquisa" placeholder="Buscar item...">
-            <input type="text" id="inputPesquisa" placeholder="Buscar item por nome ou palavra-chave..." onkeyup="buscarItens()">
-</div>
-<div class="nav-right">
-            <div id="karmaDisplay" class="karma-badge">✨ Karma: <span id="valKarma">0</span></div>
-            <div id="karmaDisplay" class="karma-badge" style="display: none;">✨ Karma: <span id="valKarma">0</span></div>
-<button class="btn-post" onclick="abrirModalPost()">+ Achei Algo</button>
-</div>
+    <div class="nav-left">
+        <div class="logo">FOUNDY<span>.</span></div>
+        <div id="authArea">
+            <button class="btn-post" onclick="abrirModalAuth()">Entrar</button>
+        </div>
+    </div>
+    <div class="search-box">
+        <input type="text" id="inputPesquisa" placeholder="Buscar item por nome..." onkeyup="buscarItens()">
+    </div>
+    <div class="nav-right">
+        <div id="karmaDisplay" class="karma-badge" style="display: none;">✨ Karma: <span id="valKarma">0</span></div>
+        <button class="btn-post" onclick="abrirModalPost()">+ Achei Algo</button>
+    </div>
 </nav>
 
 <main>
-<header class="hero">
-<h1>O que se perdeu, <span>volta.</span></h1>
-            <p>A tecnologia Bumerangue conectando comunidades.</p>
-            <p>A tecnologia conectando comunidades e devolvendo sorrisos.</p>
-</header>
+    <header class="hero">
+        <h1>O que se perdeu, <span>volta.</span></h1>
+        <p>A tecnologia conectando comunidades e devolvendo sorrisos.</p>
+    </header>
 
-<div class="filter-bar">
-<button class="filter-btn active" onclick="filtrarCategoria('Todos')">📍 Todos</button>
-<button class="filter-btn" onclick="filtrarCategoria('Chaves')">🔑 Chaves</button>
-<button class="filter-btn" onclick="filtrarCategoria('Documentos')">📄 Documentos</button>
-<button class="filter-btn" onclick="filtrarCategoria('Eletrônicos')">📱 Eletrônicos</button>
-<button class="filter-btn" onclick="filtrarCategoria('Pets')">🐶 Pets</button>
-</div>
+    <div class="filter-bar">
+        <button class="filter-btn active" onclick="filtrarCategoria('Todos')">📍 Todos</button>
+        <button class="filter-btn" onclick="filtrarCategoria('Chaves')">🔑 Chaves</button>
+        <button class="filter-btn" onclick="filtrarCategoria('Documentos')">📄 Documentos</button>
+        <button class="filter-btn" onclick="filtrarCategoria('Eletrônicos')">📱 Eletrônicos</button>
+        <button class="filter-btn" onclick="filtrarCategoria('Pets')">🐶 Pets</button>
+    </div>
 
-<section class="map-section">
-            <div style="position: relative;">
-            <div style="position: relative; padding: 0 5%;">
-<button class="btn-gps" onclick="minhaLocalizacao()">📍 Onde estou?</button>
-<div id="mapaPrincipal"></div>
-</div>
-</section>
+    <section class="map-section">
+        <div style="position: relative; padding: 0 5%;">
+            <button class="btn-gps" onclick="minhaLocalizacao()">📍 Onde estou?</button>
+            <div id="mapaPrincipal"></div>
+        </div>
+    </section>
 
-<div class="grid-items" id="itemGrid"></div>
+    <div class="grid-items" id="itemGrid"></div>
 </main>
 
 <div id="modalAuth" class="modal">
-<div class="modal-content">
-<h2 id="authTitle">Minha Conta Foundy</h2>
-<div id="authForm">
-<input type="text" id="regNome" placeholder="Nome Completo">
-<input type="email" id="regEmail" placeholder="E-mail">
-<input type="password" id="regPass" placeholder="Senha (mín. 6 caracteres)">
+    <div class="modal-content">
+        <h2 id="authTitle">Minha Conta Foundy</h2>
+        <div id="authForm">
+            <div id="camposCadastroAdicionais">
+                <input type="text" id="regNome" placeholder="Nome Completo">
+                <input type="text" id="regCpf" placeholder="CPF (Apenas números)" maxlength="11">
                 <input type="tel" id="regPhone" placeholder="Telefone (WhatsApp)">
-                <button class="btn-save" onclick="handleSignUp()">Cadastrar</button>
-                <p id="toggleAuth" onclick="toggleAuthMode()" style="cursor:pointer; font-size: 0.8rem; text-align:center; margin-top:10px">Já tem conta? Entrar</p>
+                <label style="font-size: 0.8rem; color: #94a3b8; margin-top: 10px; display: block;">Data de Nascimento</label>
+                <input type="date" id="regDataNasc" onchange="verificarIdade()">
                 
-                <div id="camposCadastroAdicionais">
-                    <input type="text" id="regCpf" placeholder="CPF (Apenas números)" maxlength="11">
-                    <input type="tel" id="regPhone" placeholder="Telefone (WhatsApp)">
-                    <label style="font-size: 0.8rem; color: var(--text-muted); margin-top: 10px; display: block;">Data de Nascimento</label>
-                    <input type="date" id="regDataNasc" onchange="verificarIdade()">
-                    
-                    <div id="authResponsavel" style="display:none; margin: 10px 0; font-size: 0.85rem; color: #fbbf24; background: rgba(251, 191, 36, 0.1); padding: 10px; border-radius: 8px;">
-                        <input type="checkbox" id="checkResponsavel" style="width: auto; margin-right: 10px;">
-                        <label for="checkResponsavel">Sou menor de idade e declaro ter autorização dos meus responsáveis legais para usar o Foundy.</label>
-                    </div>
+                <div id="authResponsavel" style="display:none; margin: 10px 0; font-size: 0.85rem; color: #fbbf24; background: rgba(251, 191, 36, 0.1); padding: 10px; border-radius: 8px;">
+                    <input type="checkbox" id="checkResponsavel" style="width: auto; margin-right: 10px;">
+                    <label for="checkResponsavel">Sou menor e tenho autorização dos responsáveis.</label>
                 </div>
+            </div>
 
-                <button class="btn-save" onclick="handleSignUp()">Continuar</button>
-                <p id="toggleAuth" onclick="toggleAuthMode()" style="cursor:pointer; font-size: 0.8rem; text-align:center; margin-top:15px; color: var(--primary);">Já tem conta? Entrar</p>
-</div>
-<button class="btn-cancel" onclick="fecharModalAuth()">Voltar</button>
-</div>
+            <input type="email" id="regEmail" placeholder="E-mail">
+            <input type="password" id="regPass" placeholder="Senha (mín. 6 caracteres)">
+            
+            <button class="btn-save" id="btnAuthSubmit" onclick="handleSignUp()">Cadastrar</button>
+            <p id="toggleAuth" onclick="toggleAuthMode()" style="cursor:pointer; font-size: 0.8rem; text-align:center; margin-top:15px; color: #2dd4bf;">Já tem conta? Entrar</p>
+        </div>
+        <button class="btn-cancel" onclick="fecharModalAuth()">Voltar</button>
+    </div>
 </div>
 
 <div id="modalPost" class="modal">
-<div class="modal-content">
-<h3>Postar Item Encontrado</h3>
-<div class="upload-zone" onclick="document.getElementById('fotoItem').click()">
-                <img id="preview" src="" style="display:none">
-                <div id="uploadPlaceholder">📸 Clique para tirar foto</div>
-                <img id="preview" src="" style="display:none; width: 100%; border-radius: 10px; margin-bottom: 10px;">
-                <div id="uploadPlaceholder">📸 Clique para adicionar uma foto clara do item</div>
-</div>
-<input type="file" id="fotoItem" accept="image/*" onchange="analisarFoto(event)" style="display:none">
+    <div class="modal-content">
+        <h3>Postar Item Encontrado</h3>
+        <div class="upload-zone" onclick="document.getElementById('fotoItem').click()">
+            <img id="preview" src="" style="display:none; width: 100%; border-radius: 10px; margin-bottom: 10px;">
+            <div id="uploadPlaceholder">📸 Clique para adicionar uma foto clara</div>
+        </div>
+        <input type="file" id="fotoItem" accept="image/*" onchange="analisarFoto(event)" style="display:none">
 
-            <input type="text" id="tituloItem" placeholder="Título do item">
-            <input type="text" id="tituloItem" placeholder="Título (ex: iPhone 13 Preto)">
-<select id="categoriaItem">
-                <option value="Outros">Categoria...</option>
-                <option value="Outros">Selecione uma categoria...</option>
-<option value="Chaves">Chaves</option>
-<option value="Documentos">Documentos</option>
-<option value="Eletrônicos">Eletrônicos</option>
-<option value="Pets">Pets</option>
-</select>
+        <input type="text" id="tituloItem" placeholder="Título (ex: iPhone 13 Preto)">
+        <select id="categoriaItem">
+            <option value="Outros">Selecione uma categoria...</option>
+            <option value="Chaves">Chaves</option>
+            <option value="Documentos">Documentos</option>
+            <option value="Eletrônicos">Eletrônicos</option>
+            <option value="Pets">Pets</option>
+        </select>
 
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 10px;">Marque no mapa onde você encontrou (aproxime para mais precisão):</p>
-<div id="mapaPost"></div>
-<input type="hidden" id="latLogItem">
-            <input type="text" id="perguntaSeguranca" placeholder="Pergunta de posse (ex: Qual a marca?)">
+        <p style="font-size: 0.85rem; color: #94a3b8; margin-top: 10px;">Onde você encontrou?</p>
+        <div id="mapaPost"></div>
+        <input type="hidden" id="latLogItem">
+        <input type="text" id="perguntaSeguranca" placeholder="Pergunta de segurança (ex: Qual o papel de parede?)">
 
-            <button class="btn-save" onclick="salvarPost()">Publicar</button>
-            <input type="text" id="perguntaSeguranca" placeholder="Pergunta de segurança (ex: Qual a foto da tela de bloqueio?)">
-            
-            <button class="btn-save" onclick="salvarPost()">Publicar Item & Ganhar Karma ✨</button>
-<button class="btn-cancel" onclick="fecharModalPost()">Cancelar</button>
-</div>
+        <button class="btn-save" onclick="salvarPost()">Publicar & Ganhar Karma ✨</button>
+        <button class="btn-cancel" onclick="fecharModalPost()">Cancelar</button>
+    </div>
 </div>
 
 <div id="modalConvite" class="modal">
-<div class="modal-content">
-            <h3>Enviar Pedido de Resgate</h3>
-            <p>Responda à pergunta do achador:</p>
-            <blockquote id="perguntaExibida" style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; margin: 10px 0;"></blockquote>
-            <textarea id="respostaConvite" placeholder="Sua resposta detalhada..."></textarea>
-            <button class="btn-save" onclick="enviarPedidoChat()">Enviar Convite</button>
-            <h3>Solicitar Resgate</h3>
-            <p style="font-size: 0.9rem; color: var(--text-muted);">Para provar que o item é seu, responda à pergunta de segurança criada por quem achou:</p>
-            <blockquote id="perguntaExibida" style="background: rgba(45, 212, 191, 0.1); border-left: 4px solid var(--primary); padding: 10px; border-radius: 0 8px 8px 0; margin: 15px 0; font-style: italic;"></blockquote>
-            <textarea id="respostaConvite" placeholder="Sua resposta detalhada... Seja o mais específico possível."></textarea>
-            <button class="btn-save" onclick="enviarPedidoChat()">Enviar Resposta para Análise</button>
-<button class="btn-cancel" onclick="fecharModalConvite()">Cancelar</button>
-</div>
+    <div class="modal-content">
+        <h3>Solicitar Resgate</h3>
+        <p style="font-size: 0.9rem; color: #94a3b8;">Responda à pergunta de segurança:</p>
+        <blockquote id="perguntaExibida" style="background: rgba(45, 212, 191, 0.1); border-left: 4px solid #2dd4bf; padding: 10px; border-radius: 0 8px 8px 0; margin: 15px 0; font-style: italic;"></blockquote>
+        <textarea id="respostaConvite" placeholder="Sua resposta detalhada..."></textarea>
+        <button class="btn-save" onclick="enviarPedidoChat()">Enviar Resposta</button>
+        <button class="btn-cancel" onclick="fecharModalConvite()">Cancelar</button>
+    </div>
 </div>
 
 <div id="modalChat" class="modal">
-<div class="modal-content chat-container">
-<div class="chat-header">
-                <h4 id="chatPartner">Conversa</h4>
-                <button onclick="fecharChat()" style="background:none; border:none; color:white; font-size:1.5rem">×</button>
-                <h4 id="chatPartner">Conversa Segura</h4>
-                <button onclick="fecharChat()" style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;">&times;</button>
-</div>
-<div id="chatMessages" class="chat-messages"></div>
-<div class="chat-input-area">
-                <input type="text" id="msgInput" placeholder="Digite sua mensagem...">
-                <button onclick="enviarMensagemReal()" class="btn-send">➡️</button>
-                <input type="text" id="msgInput" placeholder="Combine o local de entrega...">
-                <button onclick="enviarMensagemReal()" class="btn-send">➤</button>
-</div>
-</div>
+    <div class="modal-content chat-container">
+        <div class="chat-header">
+            <h4 id="chatPartner">Conversa Segura</h4>
+            <button onclick="fecharChat()" style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;">&times;</button>
+        </div>
+        <div id="chatMessages" class="chat-messages"></div>
+        <div class="chat-input-area">
+            <input type="text" id="msgInput" placeholder="Combine a entrega...">
+            <button onclick="enviarMensagemReal()" class="btn-send">➤</button>
+        </div>
+    </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="script.js"></script>
 </body>
+</html>

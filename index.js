@@ -1,18 +1,85 @@
 // --- CONFIGURAÇÃO SUPABASE ---
 const SUPABASE_URL = 'https://ndlpzprccxjpuxqtzrxl.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_94q7-RW5thyf7kBRUHDxBw_0bPPvRkX'; 
-// NOTA DE ENGENHARIA: Em produção, o RLS (Row Level Security) do Supabase DEVE estar configurado para proteger os dados sensíveis como CPF.
+const SUPABASE_KEY = 'sb_publishable_...'; // Use sua chave real aqui
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// --- VARIÁVEIS GLOBAIS ---
 let itensCadastrados = [];
 let currentUser = null;
 let currentItem = null;
 let categoriaAtiva = "Todos";
 let termoBusca = "";
 let mapaPrincipal, mapaPost, markerPost;
-let isLoginMode = false;
-let canalChat = null;
+let isLoginMode = false; // Começa como cadastro por padrão no seu HTML antigo
+
+window.addEventListener('DOMContentLoaded', async () => {
+    // Verificar sessão
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    currentUser = user;
+    
+    await carregarItens();
+    atualizarUI();
+    if(currentUser) calcularKarma();
+});
+
+async function carregarItens() {
+    const { data, error } = await supabaseClient.from('itens').select('*').order('created_at', { ascending: false });
+    if (!error) {
+        itensCadastrados = data;
+        renderizarCards();
+        initMapaPrincipal();
+    }
+}
+
+function renderizarCards() {
+    const grid = document.getElementById('itemGrid');
+    const itens = itensFiltrados();
+    grid.innerHTML = itens.length ? "" : `<p style="grid-column:1/-1; text-align:center;">Nenhum item encontrado.</p>`;
+    
+    itens.forEach(item => {
+        grid.innerHTML += `
+            <div class="card">
+                <img src="${item.foto || 'https://via.placeholder.com/300'}" alt="${item.titulo}">
+                <div class="card-content">
+                    <small>${item.categoria}</small>
+                    <h3>${item.titulo}</h3>
+                    <button class="btn-save" onclick="abrirVerificacao(${item.id})">Reivindicar</button>
+                </div>
+            </div>`;
+    });
+}
+
+function toggleAuthMode() {
+    isLoginMode = !isLoginMode;
+    document.getElementById('authTitle').innerText = isLoginMode ? "Entrar na Conta" : "Criar Conta Foundy";
+    document.getElementById('camposCadastroAdicionais').style.display = isLoginMode ? "none" : "block";
+    document.getElementById('btnAuthSubmit').innerText = isLoginMode ? "Entrar" : "Cadastrar";
+    document.getElementById('toggleAuth').innerText = isLoginMode ? "Não tem conta? Cadastrar" : "Já tem conta? Entrar";
+}
+
+async function handleSignUp() {
+    const email = document.getElementById('regEmail').value;
+    const password = document.getElementById('regPass').value;
+
+    if (isLoginMode) {
+        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) return alert("Erro: " + error.message);
+        window.location.reload();
+    } else {
+        const fullName = document.getElementById('regNome').value;
+        const cpf = document.getElementById('regCpf').value;
+        if(!fullName || !cpf) return alert("Preencha nome e CPF.");
+
+        const { error } = await supabaseClient.auth.signUp({
+            email, password,
+            options: { data: { full_name: fullName, cpf: cpf } }
+        });
+        if (error) return alert(error.message);
+        alert("Sucesso! Verifique seu e-mail.");
+    }
+}
+
+// Funções de Mapa e Modais seguem a lógica que você criou, 
+// apenas certifique-se de que os IDs batem com o novo HTML.
 
 // --- INICIALIZAÇÃO ---
 window.addEventListener('DOMContentLoaded', async () => {
