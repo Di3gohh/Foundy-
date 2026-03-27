@@ -258,29 +258,104 @@ function abrirVerificacao(id) {
 }
 
 async function enviarPedidoChat() {
-    const resposta = document.getElementById('respostaConvite').value;
-    const { error } = await supabaseClient.from('solicitações_chat').insert([{
-        item_id: currentItem.id, requisitante_id: currentUser.id,
-        dono_id: currentItem.user_id, resposta_seguranca: resposta, status: 'pendente'
-    }]);
-    if (error) alert(error.message);
-    else {
-        alert("Resposta enviada! Aguarde o dono aceitar.");
+    const resposta = document.getElementById('respostaConvite').value.trim();
+    if (!resposta) return alert("Por favor, responda à pergunta.");
+    
+    const btn = document.querySelector('#modalConvite .btn-save');
+    btn.disabled = true;
+    btn.innerText = "Enviando...";
+
+    try {
+        // 1. Salva no banco
+        const { error } = await supabaseClient.from('solicitações_chat').insert([{
+            item_id: currentItem.id,
+            requisitante_id: currentUser.id,
+            dono_id: currentItem.user_id,
+            resposta_seguranca: resposta,
+            status: 'pendente'
+        }]);
+
+        if (error) throw error;
+
+        // 2. Envia o E-mail via EmailJS
+        // IMPORTANTE: currentItem.owner_email deve conter o email do dono!
+        if (currentItem.owner_email) {
+            await emailjs.send("service_7kr10yr", "template_7kr10yr", {
+                item_title: currentItem.titulo,
+                user_name: currentUser.user_metadata.full_name || "Alguém",
+                answer: resposta,
+                owner_email: currentItem.owner_email // O destinatário no EmailJS deve ser {{owner_email}}
+            });
+        }
+
+        alert("Solicitação enviada com sucesso!");
         fecharModalConvite();
+        checarMeusPedidos();
+    } catch (err) {
+        console.error("Erro completo:", err);
+        alert("Erro ao processar solicitação.");
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Enviar Resposta";
     }
 }
 
 async function abrirModalPedidos() {
-    document.getElementById('modalPedidos').style.display = 'flex';
-    const { data } = await supabaseClient.from('solicitações_chat').select('*, requisitante_id(full_name)').eq('dono_id', currentUser.id).eq('status', 'pendente');
+    const modal = document.getElementById('modalPedidos');
     const lista = document.getElementById('listaPedidosPendentes');
-    lista.innerHTML = (data?.length > 0) ? data.map(p => `
-        <div style="margin-bottom:10px; padding:10px; background:rgba(255,255,255,0.05); border-radius:8px;">
-            <p><b>${p.requisitante_id?.full_name || 'Alguém'}</b> respondeu:</p>
-            <p>"${p.resposta_seguranca}"</p>
-            <button class="btn-save" onclick="aceitarPedido('${p.id}')">Aceitar</button>
-        </div>
-    `).join('') : '<p>Nada por aqui.</p>';
+    
+    if (!modal || !lista) return;
+
+    modal.style.display = 'flex';
+    lista.innerHTML = '<p style="text-align:center;">Carregando solicitações...</p>';
+
+    try {
+        // Buscamos as solicitações e o nome de quem enviou (via inner join com a tabela de perfis/metadata)
+        const { data, error } = await supabaseClient
+            .from('solicitações_chat')
+            .select(`
+                id, 
+                resposta_seguranca, 
+                item_id,
+                itens (titulo),
+                requisitante_id
+            `)
+            .eq('dono_id', currentUser.id)
+            .eq('status', 'pendente');
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            lista.innerHTML = '<p style="text-align:center; color:gray; padding:20px;">Nenhuma solicitação nova por aqui. 🔔</p>';
+            return;
+        }
+
+        lista.innerHTML = data.map(p => `
+            <div style="background:rgba(255,255,255,0.05); padding:15px; border-radius:12px; margin-bottom:15px; border:1px solid rgba(255,255,255,0.1);">
+                <p style="font-size:0.8rem; color:var(--primary); margin-bottom:5px;">Solicitação para: <b>${p.itens?.titulo || 'Item'}</b></p>
+                <p style="font-style:italic; background:rgba(0,0,0,0.2); padding:10px; border-radius:8px; margin:10px 0;">
+                    "${p.resposta_seguranca}"
+                </p>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn-save" style="flex:1; padding:8px;" onclick="aceitarPedido('${p.id}')">Aceitar</button>
+                    <button class="btn-outline" style="flex:1; padding:8px; border-color:#ff4d4d; color:#ff4d4d;" onclick="recusarPedido('${p.id}')">Recusar</button>
+                </div>
+            </div>
+        `).join('');
+
+    } catch (err) {
+        console.error(err);
+        lista.innerHTML = '<p style="color:red;">Erro ao carregar pedidos.</p>';
+    }
+}
+
+// Função para recusar (apaga a solicitação)
+async function recusarPedido(id) {
+    if(confirm("Deseja recusar esta solicitação?")) {
+        await supabaseClient.from('solicitações_chat').delete().eq('id', id);
+        abrirModalPedidos(); // Atualiza a lista
+        checarMeusPedidos(); // Atualiza o sino
+    }
 }
 
 async function aceitarPedido(id) {
