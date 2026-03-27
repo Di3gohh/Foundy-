@@ -127,3 +127,53 @@ def listar_itens(db: Session = Depends(get_db)):
 @app.post("/api/itens", response_model=models.ItemResponse, status_code=201)
 def criar_item(item: models.ItemCreate, db: Session = Depends(get_db)):
     return services.registrar_novo_item(item, db)
+    # models.py - Adicionar estes esquemas
+class ChatRequest(BaseModel):
+    item_id: int
+    requisitante_id: str
+    resposta_seguranca: str
+
+class MessageCreate(BaseModel):
+    chat_id: int
+    sender_id: str
+    texto: str
+
+# database.py - Adicionar estas tabelas
+class DBChat(Base):
+    __tablename__ = "chats"
+    id = Column(Integer, primary_key=True)
+    item_id = Column(Integer)
+    dono_id = Column(String)
+    requisitante_id = Column(String)
+    status = Column(String, default="pendente") # pendente, aprovado
+    resposta_seguranca = Column(String)
+
+class DBMessage(Base):
+    __tablename__ = "messages"
+    id = Column(Integer, primary_key=True)
+    chat_id = Column(Integer)
+    sender_id = Column(String)
+    texto = Column(String)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
+# main.py - Novos Endpoints
+@app.post("/api/chats/solicitar")
+def solicitar_chat(req: ChatRequest, db: Session = Depends(get_db)):
+    # Lógica: Busca o dono do item e cria chat pendente
+    item = db.query(DBItem).filter(DBItem.id == req.item_id).first()
+    novo_chat = DBChat(
+        item_id=req.item_id, 
+        dono_id=item.user_id, 
+        requisitante_id=req.requisitante_id,
+        resposta_seguranca=req.resposta_seguranca
+    )
+    db.add(novo_chat)
+    db.commit()
+    return {"status": "enviado"}
+
+@app.get("/api/chats/ativos/{user_id}")
+def listar_chats_ativos(user_id: str, db: Session = Depends(get_db)):
+    return db.query(DBChat).filter(
+        ((DBChat.dono_id == user_id) | (DBChat.requisitante_id == user_id)),
+        DBChat.status == "aprovado"
+    ).all()
