@@ -1,6 +1,8 @@
 // --- CONFIGURAÇÃO SUPABASE ---
 const SUPABASE_URL = 'https://ndlpzprccxjpuxqtzrxl.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_...'; // Substitua pela sua chave REAL
+const SUPABASE_KEY = 'sb_publishable_94q7-RW5thyf7kBRUHDxBw_0bPPvRkX'; 
+
+// Inicialização correta do cliente
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // --- ESTADO GLOBAL ---
@@ -107,7 +109,6 @@ function verificarIdade() {
     if (m < 0 || (m === 0 && hoje.getDate() < nascimento.getDate())) idade--;
     
     const divResp = document.getElementById('authResponsavel');
-    // Se menor de 18, mostra o aviso de autorização
     divResp.style.display = (idade < 18) ? "block" : "none";
 }
 
@@ -167,7 +168,7 @@ async function handleSignUp() {
 
 function atualizarUI() {
     const authArea = document.getElementById('authArea');
-    if (currentUser) {
+    if (currentUser && authArea) {
         const primeiroNome = currentUser.user_metadata.full_name?.split(' ')[0] || "Usuário";
         authArea.innerHTML = `
             <span style="font-weight:600;">Olá, <span style="color:var(--primary);">${primeiroNome}</span></span> 
@@ -236,6 +237,30 @@ function analisarFoto(e) {
     reader.readAsDataURL(file);
 }
 
+// --- FUNÇÃO DE UPLOAD PARA O STORAGE ---
+async function uploadFoto(file) {
+    try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const { data, error } = await supabaseClient.storage
+            .from('fotos-itens')
+            .upload(filePath, file);
+
+        if (error) throw error;
+
+        const { data: { publicUrl } } = supabaseClient.storage
+            .from('fotos-itens')
+            .getPublicUrl(filePath);
+
+        return publicUrl;
+    } catch (err) {
+        console.error("Erro no upload:", err);
+        return null;
+    }
+}
+
 async function salvarPost() {
     if (!currentUser) return abrirModalAuth();
     
@@ -243,32 +268,29 @@ async function salvarPost() {
     const localRaw = document.getElementById('latLogItem').value;
     const categoria = document.getElementById('categoriaItem').value;
     const pergunta = document.getElementById('perguntaSeguranca').value.trim();
-    const fotoInput = document.getElementById('fotoItem'); // O input de arquivo
+    const fotoInput = document.getElementById('fotoItem'); 
     const file = fotoInput.files[0];
 
     if (!titulo || !localRaw || categoria === "Outros" || !pergunta || !file) {
         return alert("Preencha todos os campos e selecione uma foto.");
     }
 
-    const btn = document.querySelector('.btn-save');
+    const btn = document.getElementById('btnPublish') || document.querySelector('.btn-save');
     const originalText = btn.innerText;
 
     try {
         btn.innerText = "Enviando imagem...";
         btn.disabled = true;
 
-        // PASSO 1: Upload da imagem para o Storage
         const urlDaFoto = await uploadFoto(file);
-        
         if (!urlDaFoto) throw new Error("Falha ao processar imagem.");
 
         btn.innerText = "Publicando item...";
 
-        // PASSO 2: Salvar os dados no Banco de Dados (com a URL da foto)
         const { error } = await supabaseClient.from('itens').insert([{
             titulo, 
             categoria, 
-            foto: urlDaFoto, // Agora salvamos o LINK, não a imagem inteira
+            foto: urlDaFoto,
             pergunta,
             lat: JSON.parse(localRaw).lat, 
             lng: JSON.parse(localRaw).lng,
@@ -281,7 +303,7 @@ async function salvarPost() {
         alert("Item publicado com sucesso! ✨");
         fecharModalPost();
         await carregarItens();
-        if (typeof calcularKarma === "function") calcularKarma();
+        calcularKarma();
 
     } catch (err) { 
         alert("Erro: " + err.message); 
@@ -296,7 +318,6 @@ function abrirVerificacao(id) {
     if (!currentUser) return abrirModalAuth();
     currentItem = itensCadastrados.find(i => i.id === id);
     
-    // Se o usuário clicar no próprio item, abre o chat direto
     if (currentItem.user_id === currentUser.id) return abrirChatReal(id);
 
     document.getElementById('perguntaExibida').innerText = currentItem.pergunta;
@@ -347,16 +368,19 @@ async function carregarMensagens(itemId) {
         .order('created_at', { ascending: true });
         
     const chatContainer = document.getElementById('chatMessages');
-    chatContainer.innerHTML = '';
-    if (msgs) msgs.forEach(m => adicionarMensagemUI(m));
+    if(chatContainer) {
+        chatContainer.innerHTML = '';
+        if (msgs) msgs.forEach(m => adicionarMensagemUI(m));
+    }
 }
 
 function adicionarMensagemUI(m) {
     const chatBox = document.getElementById('chatMessages');
+    if(!chatBox) return;
+
     const isMine = m.sender_id === currentUser.id;
     const msgDiv = document.createElement('div');
     
-    // Estilo simples para bolhas de chat
     msgDiv.style.alignSelf = isMine ? 'flex-end' : 'flex-start';
     msgDiv.style.background = isMine ? 'var(--primary)' : 'rgba(255,255,255,0.1)';
     msgDiv.style.color = isMine ? '#0b0f1a' : 'white';
@@ -415,29 +439,3 @@ function setMarkerPost(latlng) {
 }
 
 function fecharModalPost() { document.getElementById('modalPost').style.display = 'none'; }
-// --- FUNÇÃO DE UPLOAD PARA O STORAGE ---
-async function uploadFoto(file) {
-    try {
-        // Cria um nome único para o arquivo (ex: 167890123-foto.jpg)
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const filePath = `${fileName}`;
-
-        // 1. Faz o upload para o bucket 'fotos-itens'
-        const { data, error } = await supabaseClient.storage
-            .from('fotos-itens')
-            .upload(filePath, file);
-
-        if (error) throw error;
-
-        // 2. Pega a URL pública da imagem
-        const { data: { publicUrl } } = supabaseClient.storage
-            .from('fotos-itens')
-            .getPublicUrl(filePath);
-
-        return publicUrl;
-    } catch (err) {
-        console.error("Erro no upload:", err);
-        return null;
-    }
-}
