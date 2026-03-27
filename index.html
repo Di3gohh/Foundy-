@@ -4,139 +4,162 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Foundy | O que se perdeu, volta.</title>
-    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;800&display=swap" rel="stylesheet">
-    
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <div id="toast-container"></div>
-
-    <nav class="navbar">
-        <div class="nav-left">
-            <div class="logo">FOUNDY<span>.</span></div>
+<nav class="navbar">
+    <div class="nav-left">
+        <div class="logo">FOUNDY<span>.</span></div>
+    </div>
+    <div class="search-box">
+        <input type="text" id="inputPesquisa" placeholder="🔍 Buscar item perdido..." onkeyup="buscarItens()">
+    </div>
+    <div class="nav-right" id="navRightPanel">
+        <button id="btnNotificacoes" class="btn-icon" onclick="abrirModalPedidos()" style="display:none; background:none; border:none; font-size:1.4rem; cursor:pointer; position:relative;">
+            🔔 <span id="badgeNotificacao" style="position:absolute; top:0; right:0; background:red; color:white; border-radius:50%; font-size:0.6rem; padding:2px 5px; display:none;">0</span>
+        </button>
+        
+        <div id="authArea">
+            <button class="btn-post btn-outline" onclick="abrirModalAuth()">Entrar</button>
         </div>
-        <div class="search-box">
-            <input type="text" id="inputPesquisa" placeholder="🔍 Buscar item perdido..." onkeyup="buscarItens()">
-        </div>
-        <div class="nav-right" id="navRightPanel">
-            <button id="btnNotificacoes" class="btn-icon" onclick="abrirModalPedidos()" style="display:none;">
-                🔔 <span id="badgeNotificacao">0</span>
-            </button>
-            
-            <div id="authArea">
-                <button class="btn-outline" onclick="abrirModalAuth()">Entrar</button>
-            </div>
-            <button class="btn-post" onclick="abrirModalPost()">+ Achei Algo</button>
-        </div>
-    </nav>
+        <div id="karmaDisplay" class="karma-badge" style="display: none;">✨ <span id="valKarma">0</span></div>
+        <button class="btn-post" onclick="abrirModalPost()">+ Achei Algo</button>
+    </div>
+</nav>
 
-    <main>
-        <header class="hero">
-            <h1>O que se perdeu, <span>volta.</span></h1>
-            <p>Conectando a comunidade para devolver o que é importante.</p>
-        </header>
+<main>
+    <header class="hero">
+        <h1>O que se perdeu, <span>volta.</span></h1>
+        <p>A tecnologia conectando pessoas e devolvendo sorrisos à comunidade.</p>
+    </header>
 
-        <div class="filter-bar">
-            <button class="filter-btn active" onclick="filtrarCategoria('Todos')">📍 Todos</button>
-            <button class="filter-btn" onclick="filtrarCategoria('Chaves')">🔑 Chaves</button>
-            <button class="filter-btn" onclick="filtrarCategoria('Documentos')">📄 Documentos</button>
-            <button class="filter-btn" onclick="filtrarCategoria('Eletrônicos')">📱 Eletrônicos</button>
-            <button class="filter-btn" onclick="filtrarCategoria('Pets')">🐶 Pets</button>
-        </div>
-
-        <section class="map-section">
-            <div class="map-container">
-                <button class="btn-gps" onclick="minhaLocalizacao()">📍 Meu Local</button>
-                <div id="mapaPrincipal"></div>
-            </div>
-        </section>
-
-        <div class="grid-items" id="itemGrid">
-            </div>
-    </main>
-
-    <div id="chat-fab" style="display: none;" onclick="toggleListaChats()">
-        <span>💬</span>
-        <div class="badge" id="chatBadge">0</div>
+    <div class="filter-bar">
+        <button class="filter-btn active" onclick="filtrarCategoria('Todos')">📍 Todos</button>
+        <button class="filter-btn" onclick="filtrarCategoria('Chaves')">🔑 Chaves</button>
+        <button class="filter-btn" onclick="filtrarCategoria('Documentos')">📄 Documentos</button>
+        <button class="filter-btn" onclick="filtrarCategoria('Eletrônicos')">📱 Eletrônicos</button>
+        <button class="filter-btn" onclick="filtrarCategoria('Pets')">🐶 Pets</button>
     </div>
 
-    <div id="modalListaChats" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Suas Conversas</h3>
-                <button class="close-btn" onclick="fecharModal('modalListaChats')">&times;</button>
-            </div>
-            <div id="listaConversas" class="chat-list-container">
+    <section class="map-section">
+        <div class="map-container">
+            <button class="btn-gps" onclick="minhaLocalizacao()" title="Onde estou?">📍 Meu Local</button>
+            <div id="mapaPrincipal"></div>
+        </div>
+    </section>
+
+    <div class="grid-items" id="itemGrid"></div>
+</main>
+
+<div id="modalPedidos" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Solicitações de Resgate</h3>
+            <button class="close-btn" onclick="document.getElementById('modalPedidos').style.display='none'">&times;</button>
+        </div>
+        <div id="listaPedidosPendentes" style="max-height: 400px; overflow-y: auto;">
+            <p style="text-align:center; padding:20px; color:gray;">Nenhuma solicitação pendente.</p>
+        </div>
+    </div>
+</div>
+
+<div id="modalAuth" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="authTitle">Criar Conta Foundy</h2>
+            <button class="close-btn" onclick="fecharModalAuth()">&times;</button>
+        </div>
+        <div id="authForm" class="form-group">
+            <div id="camposCadastroAdicionais">
+                <input type="text" id="regNome" placeholder="Nome Completo">
+                <input type="text" id="regCpf" placeholder="CPF (Apenas números)" maxlength="11">
+                <input type="tel" id="regPhone" placeholder="Telefone / WhatsApp">
+                <label class="label-info">Data de Nascimento</label>
+                <input type="date" id="regDataNasc" onchange="verificarIdade()">
+                <div id="authResponsavel" class="warning-box" style="display:none;">
+                    <div style="display: flex; gap: 10px; align-items: flex-start;">
+                        <input type="checkbox" id="checkResponsavel" style="width: auto; margin-top: 5px;">
+                        <label for="checkResponsavel" style="font-size: 0.8rem;">Sou menor e possuo autorização dos responsáveis.</label>
+                    </div>
                 </div>
+            </div>
+            <input type="email" id="regEmail" placeholder="Seu E-mail">
+            <input type="password" id="regPass" placeholder="Senha (mín. 6 caracteres)">
+            <button class="btn-save" id="btnAuthSubmit" onclick="handleSignUp()">Cadastrar e Confirmar E-mail</button>
+            <p id="toggleAuth" onclick="toggleAuthMode()" style="cursor:pointer; font-size: 0.8rem; text-align:center; margin-top:15px">Já tem conta? Entrar</p>
         </div>
     </div>
+</div>
 
-    <div id="modalChat" class="modal">
-        <div class="modal-content chat-container">
-            <div class="chat-header">
-                <div class="chat-info">
-                    <div class="status-dot"></div>
-                    <h4 id="chatPartner">Conversa</h4>
-                </div>
-                <button onclick="fecharModal('modalChat')" class="close-btn">&times;</button>
+<div id="modalPost" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Postar Item Encontrado</h3>
+            <button class="close-btn" onclick="fecharModalPost()">&times;</button>
+        </div>
+        <div class="upload-zone" onclick="document.getElementById('fotoItem').click()">
+            <img id="preview" src="" style="display:none; width: 100%; border-radius: 10px; margin-bottom: 10px;">
+            <div id="uploadPlaceholder">📸 Clique para tirar foto ou upload</div>
+        </div>
+        <input type="file" id="fotoItem" accept="image/*" onchange="analisarFoto(event)" style="display:none">
+        <input type="text" id="tituloItem" placeholder="O que você encontrou?">
+        <select id="categoriaItem">
+            <option value="Outros">Selecione a Categoria...</option>
+            <option value="Chaves">Chaves</option>
+            <option value="Documentos">Documentos</option>
+            <option value="Eletrônicos">Eletrônicos</option>
+            <option value="Pets">Pets</option>
+        </select>
+        <p style="font-size: 0.8rem; margin-top: 10px; color: var(--text-muted)">Onde encontrou?</p>
+        <div id="mapaPost" style="height: 180px; border-radius: 12px; margin-bottom: 15px;"></div>
+        <input type="hidden" id="latLogItem">
+        <input type="text" id="perguntaSeguranca" placeholder="Pergunta (ex: Qual a marca?)">
+        <button class="btn-save" id="btnPublish" onclick="salvarPost()">Publicar Agora</button>
+    </div>
+</div>
+
+<div id="modalConvite" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Solicitar Resgate</h3>
+            <button class="close-btn" onclick="fecharModalConvite()">&times;</button>
+        </div>
+        <p>Responda para abrir o chat:</p>
+        <blockquote id="perguntaExibida" class="quote-box"></blockquote>
+        <textarea id="respostaConvite" placeholder="Sua resposta aqui..."></textarea>
+        <button class="btn-save" onclick="enviarPedidoChat()">Enviar Resposta</button>
+    </div>
+</div>
+
+<div id="modalChat" class="modal">
+    <div class="modal-content chat-container">
+        <div class="chat-header">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <div id="statusOnline" class="status-dot"></div>
+                <h4 id="chatPartner">Conversa</h4>
             </div>
-            <div id="chatMessages" class="chat-messages">
-                </div>
-            <div class="chat-input-area">
-                <input type="text" id="msgInput" placeholder="Digite sua mensagem..." onkeypress="handleChatKey(event)">
-                <button onclick="enviarMensagemReal()" class="btn-send">🚀</button>
-            </div>
+            <button onclick="fecharChat()" style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer">&times;</button>
+        </div>
+        <div id="chatMessages" class="chat-messages"></div>
+        <div class="chat-input-area">
+            <input type="text" id="msgInput" placeholder="Escreva sua mensagem...">
+            <button onclick="enviarMensagemReal()" class="btn-send">➡️</button>
         </div>
     </div>
-
-    <div id="modalPedidos" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Solicitações de Resgate</h3>
-                <button class="close-btn" onclick="fecharModal('modalPedidos')">&times;</button>
-            </div>
-            <div id="listaPedidosPendentes" class="pedidos-scroll">
-                <p class="empty-msg">Nenhuma solicitação pendente.</p>
-            </div>
-        </div>
-    </div>
-
-    <div id="modalPost" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Postar Item Encontrado</h3>
-                <button class="close-btn" onclick="fecharModal('modalPost')">&times;</button>
-            </div>
-            <div class="form-group">
-                <div class="upload-zone" onclick="document.getElementById('fotoItem').click()">
-                    <img id="preview" src="" style="display:none;">
-                    <div id="uploadPlaceholder">📸 Clique para Foto</div>
-                </div>
-                <input type="file" id="fotoItem" accept="image/*" onchange="analisarFoto(event)" hidden>
-                
-                <input type="text" id="tituloItem" placeholder="O que você encontrou?">
-                <select id="categoriaItem">
-                    <option value="Outros">Selecione a Categoria...</option>
-                    <option value="Chaves">Chaves</option>
-                    <option value="Documentos">Documentos</option>
-                    <option value="Eletrônicos">Eletrônicos</option>
-                    <option value="Pets">Pets</option>
-                </select>
-
-                <p class="label-small">Marque no mapa onde encontrou:</p>
-                <div id="mapaPost"></div>
-                <input type="hidden" id="latLogItem">
-                
-                <input type="text" id="perguntaSeguranca" placeholder="Pergunta (ex: Qual a marca?)">
-                <button class="btn-save" onclick="salvarPost()">Publicar Agora</button>
-            </div>
-        </div>
-    </div>
+</div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+<script type="text/javascript">
+   (function(){
+      // Coloque sua Public Key do EmailJS aqui
+      emailjs.init("KegrQiEmVKMQJKaWy"); 
+   })();
+</script>
     <script src="script.js"></script>
 </body>
 </html>
