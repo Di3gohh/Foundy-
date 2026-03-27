@@ -439,3 +439,45 @@ function setMarkerPost(latlng) {
 }
 
 function fecharModalPost() { document.getElementById('modalPost').style.display = 'none'; }
+async function enviarPedidoChat() { 
+    const resposta = document.getElementById('respostaConvite').value.trim();
+    if (!resposta) return alert("Por favor, responda à pergunta.");
+    
+    try {
+        // 1. Salva a "ficha" de solicitação no banco
+        const { error } = await supabaseClient.from('solicitações_chat').insert([{
+            item_id: currentItem.id,
+            requisitante_id: currentUser.id,
+            dono_id: currentItem.user_id,
+            resposta_seguranca: resposta,
+            status: 'pendente' // Começa esperando o dono aceitar
+        }]);
+
+        if (error) throw error;
+
+        // 2. Toca a campainha (Envia o e-mail pelo EmailJS)
+        emailjs.send("service_id", "template_id", {
+            item_title: currentItem.titulo,
+            user_name: currentUser.user_metadata.full_name,
+            answer: resposta,
+            owner_email: currentItem.owner_email // O dono precisa ter e-mail na tabela itens
+        });
+
+        alert("Pedido enviado! Aguarde o dono aceitar para liberar o chat.");
+        fecharModalConvite();
+    } catch (err) {
+        alert("Erro: " + err.message);
+    }
+}
+async function checarMeusPedidos() {
+    const { data, error } = await supabaseClient
+        .from('solicitações_chat')
+        .select('*, requisitante_id(full_name)') // Pega o nome de quem quer o item
+        .eq('dono_id', currentUser.id)
+        .eq('status', 'pendente');
+
+    if (data && data.length > 0) {
+        // Mostra pro dono: "Fulano respondeu: X. [Aceitar] [Recusar]"
+        console.log("Você tem novos pedidos!", data);
+    }
+}
