@@ -1,4 +1,5 @@
-// --- CONFIGURAÇÃO SUPABASE ---
+// --- CONFIGURAÇÃO ---
+const API_URL = 'http://127.0.0.1:8000/api';
 const SUPABASE_URL = 'https://ndlpzprccxjpuxqtzrxl.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_94q7-RW5thyf7kBRUHDxBw_0bPPvRkX'; 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -9,9 +10,10 @@ let currentUser = null;
 let currentItem = null;
 let categoriaAtiva = "Todos";
 let termoBusca = "";
-let mapaPrincipal, mapaPost, markerPost;
+let mapaPrincipal = null;
+let mapaPost = null;
+let markerPost = null;
 let isLoginMode = false;
-let canalChat = null;
 
 // --- INICIALIZAÇÃO ---
 window.addEventListener('DOMContentLoaded', async () => {
@@ -23,20 +25,19 @@ window.addEventListener('DOMContentLoaded', async () => {
     
     if (currentUser) {
         calcularKarma();
-        checarMeusPedidos();
+        checkNotifications();
+        // Polling para notificações a cada 15 segundos
+        setInterval(checkNotifications, 15000);
     }
 });
 
-// --- SISTEMA DE DADOS ---
+// --- SISTEMA DE DADOS (API PYTHON) ---
 async function carregarItens() {
     try {
-        const { data, error } = await supabaseClient
-            .from('itens')
-            .select('*')
-            .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        itensCadastrados = data || [];
+        const response = await fetch(`${API_URL}/itens`);
+        if (!response.ok) throw new Error("Erro ao buscar itens da API");
+        
+        itensCadastrados = await response.json();
         renderizarCards();
         initMapaPrincipal();
     } catch (err) {
@@ -47,6 +48,7 @@ async function carregarItens() {
 function renderizarCards() {
     const grid = document.getElementById('itemGrid');
     if (!grid) return;
+    
     const itens = itensFiltrados();
     
     if (itens.length === 0) {
@@ -55,14 +57,16 @@ function renderizarCards() {
     }
 
     grid.innerHTML = itens.map(i => {
-        // Lógica inteligente do botão: Se for meu, ver mensagens. Se não, reivindicar.
-        const textoBotao = (currentUser && i.user_id === currentUser.id) ? 'Ver Mensagens' : 'É meu! (Reivindicar)';
+        const isOwner = currentUser && i.user_id === currentUser.id;
+        const textoBotao = isOwner ? 'Ver Mensagens' : 'É meu! (Reivindicar)';
         
         return `
             <div class="card">
-                <img src="${i.foto || 'https://via.placeholder.com/400x250?text=Sem+Foto'}" loading="lazy" alt="${i.titulo}">
+                <div class="card-image-container">
+                    <img src="${i.foto || 'https://via.placeholder.com/400x250?text=Sem+Foto'}" loading="lazy" alt="${i.titulo}">
+                </div>
                 <div class="card-content">
-                    <small>${i.categoria}</small>
+                    <small class="category-tag">${i.categoria}</small>
                     <h3>${i.titulo}</h3>
                     <button class="btn-save" onclick="abrirVerificacao(${i.id})">${textoBotao}</button>
                 </div>
@@ -81,7 +85,8 @@ function buscarItens() {
 function filtrarCategoria(cat) {
     categoriaAtiva = cat;
     document.querySelectorAll('.filter-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.innerText.includes(cat));
+        const text = btn.innerText || btn.textContent;
+        btn.classList.toggle('active', text.includes(cat));
     });
     renderizarCards();
     atualizarMarkersMapa();
@@ -95,7 +100,7 @@ function itensFiltrados() {
     });
 }
 
-// --- AUTENTICAÇÃO (COM VALIDAÇÕES DO ANTIGO) ---
+// --- AUTENTICAÇÃO (SUPABASE) ---
 function toggleAuthMode() {
     isLoginMode = !isLoginMode;
     document.getElementById('authTitle').innerText = isLoginMode ? "Entrar na Conta" : "Criar Conta Foundy";
@@ -163,23 +168,28 @@ async function sairConta() {
 }
 
 function calcularKarma() {
-    const meusItens = itensCadastrados.filter(i => i.user_id === currentUser?.id);
+    if (!currentUser) return;
+    const meusItens = itensCadastrados.filter(i => i.user_id === currentUser.id);
     const valKarma = document.getElementById('valKarma');
     if(valKarma) valKarma.innerText = meusItens.length * 10;
     document.getElementById('karmaDisplay').style.display = 'block';
 }
 
-// --- MAPAS ---
+// --- MAPAS (LEAFLET) ---
 function initMapaPrincipal() {
     if (mapaPrincipal) return;
     mapaPrincipal = L.map('mapaPrincipal').setView([-23.55, -46.63], 13);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(mapaPrincipal);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(mapaPrincipal);
     atualizarMarkersMapa();
 }
 
 function atualizarMarkersMapa() {
     if (!mapaPrincipal) return;
+    // Remove markers antigos
     mapaPrincipal.eachLayer(l => { if (l instanceof L.Marker) mapaPrincipal.removeLayer(l); });
+    
     itensFiltrados().forEach(item => {
         L.marker([item.lat, item.lng]).addTo(mapaPrincipal)
          .bindPopup(`<b>${item.titulo}</b><br><button onclick="abrirVerificacao(${item.id})" style="cursor:pointer; margin-top:5px">Ver Detalhes</button>`);
@@ -189,12 +199,14 @@ function atualizarMarkersMapa() {
 function minhaLocalizacao() {
     if ("geolocation" in navigator) {
         navigator.geolocation.getCurrentPosition(p => {
-            mapaPrincipal.setView([p.coords.latitude, p.coords.longitude], 15);
-        }, () => alert("Ative a localização."));
+            const pos = [p.coords.latitude, p.coords.longitude];
+            mapaPrincipal.setView(pos, 15);
+            L.circle(pos, {radius: 200}).addTo(mapaPrincipal);
+        }, () => alert("Por favor, ative a localização no navegador."));
     }
 }
 
-// --- POSTAGEM E UPLOAD ---
+// --- POSTAGEM ---
 function analisarFoto(e) {
     const file = e.target.files[0];
     if (file) {
@@ -209,93 +221,116 @@ function analisarFoto(e) {
     }
 }
 
-async function uploadFoto(file) {
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
-    const { data, error } = await supabaseClient.storage.from('fotos-itens').upload(fileName, file);
-    if (error) return null;
-    const { data: { publicUrl } } = supabaseClient.storage.from('fotos-itens').getPublicUrl(fileName);
-    return publicUrl;
-}
-
 async function salvarPost() {
     if (!currentUser) return abrirModalAuth();
+    
     const titulo = document.getElementById('tituloItem').value;
+    const categoria = document.getElementById('categoriaItem').value;
+    const pergunta = document.getElementById('perguntaSeguranca').value;
     const localRaw = document.getElementById('latLogItem').value;
-    const file = document.getElementById('fotoItem').files[0];
+    const previewImg = document.getElementById('preview').src;
 
-    if (!titulo || !localRaw || !file) return alert("Preencha tudo!");
+    if (!titulo || !localRaw || !previewImg || categoria === "Outros") {
+        return alert("Preencha todos os campos, selecione a categoria e marque o local no mapa!");
+    }
+
+    const coords = JSON.parse(localRaw);
+
+    const payload = {
+        titulo,
+        categoria,
+        pergunta,
+        foto: previewImg, // Enviando Base64 para o Python processar a censura
+        lat: coords.lat,
+        lng: coords.lng,
+        user_id: currentUser.id,
+        usuario_nome: currentUser.user_metadata.full_name || "Usuário Foundy"
+    };
 
     try {
-        const url = await uploadFoto(file);
-        const { error } = await supabaseClient.from('itens').insert([{
-            titulo, foto: url, categoria: document.getElementById('categoriaItem').value,
-            pergunta: document.getElementById('perguntaSeguranca').value,
-            lat: JSON.parse(localRaw).lat, lng: JSON.parse(localRaw).lng,
-            user_id: currentUser.id, usuario_nome: currentUser.user_metadata.full_name
-        }]);
-        if (error) throw error;
-        location.reload();
-    } catch (err) { alert(err.message); }
-}
+        const response = await fetch(`${API_URL}/itens`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
 
-// --- NOTIFICAÇÕES E CHAT ---
-async function checarMeusPedidos() {
-    const { data } = await supabaseClient.from('solicitações_chat').select('id').eq('dono_id', currentUser.id).eq('status', 'pendente');
-    const badge = document.getElementById('badgeNotificacao');
-    if (data?.length > 0) {
-        badge.innerText = data.length;
-        badge.style.display = 'flex';
+        if (!response.ok) throw new Error("Erro ao salvar no servidor.");
+        
+        alert("Item publicado com sucesso!");
+        location.reload();
+    } catch (err) { 
+        alert("Erro: " + err.message); 
     }
 }
 
+// --- NOTIFICAÇÕES (API PYTHON) ---
+async function checkNotifications() {
+    if (!currentUser) return;
+    try {
+        const res = await fetch(`${API_URL}/notifications/${currentUser.id}`);
+        const data = await res.json();
+        
+        const badge = document.getElementById('badgeNotificacao');
+        const dropdown = document.getElementById('notifDropdown');
+        
+        if (data && data.length > 0) {
+            badge.innerText = data.length;
+            badge.style.display = 'flex';
+            
+            dropdown.innerHTML = data.map(n => `
+                <div class="notif-item" style="padding:10px; border-bottom:1px solid #333;">
+                    <p><b>${n.sender_name}</b> quer falar sobre um item.</p>
+                    <div style="display:flex; gap:5px; margin-top:5px;">
+                        <button class="btn-save" style="padding:2px 8px; font-size:11px" onclick="responderNotificacao(${n.id}, 'accepted')">Aceitar</button>
+                        <button class="btn-outline" style="padding:2px 8px; font-size:11px" onclick="responderNotificacao(${n.id}, 'rejected')">Recusar</button>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            badge.style.display = 'none';
+            dropdown.innerHTML = '<p style="padding:10px; color:gray; text-align:center;">Sem notificações</p>';
+        }
+    } catch (err) {
+        console.error("Erro ao checar notificações", err);
+    }
+}
+
+async function responderNotificacao(id, acao) {
+    try {
+        await fetch(`${API_URL}/notifications/respond`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ notification_id: id, action: acao })
+        });
+        checkNotifications();
+    } catch (err) {
+        alert("Erro ao responder solicitação.");
+    }
+}
+
+function toggleNotif() {
+    const drop = document.getElementById('notifDropdown');
+    drop.style.display = (drop.style.display === 'block') ? 'none' : 'block';
+}
+
+// --- MODAIS E CHAT ---
 function abrirVerificacao(id) {
     if (!currentUser) return abrirModalAuth();
     currentItem = itensCadastrados.find(i => i.id === id);
-    if (currentItem.user_id === currentUser.id) return abrirChatReal(id);
+    
+    if (currentItem.user_id === currentUser.id) {
+        alert("Este item foi postado por você.");
+        return;
+    }
 
     document.getElementById('perguntaExibida').innerText = currentItem.pergunta;
     document.getElementById('modalConvite').style.display = 'flex';
 }
 
-async function enviarPedidoChat() {
-    const resposta = document.getElementById('respostaConvite').value;
-    const { error } = await supabaseClient.from('solicitações_chat').insert([{
-        item_id: currentItem.id, requisitante_id: currentUser.id,
-        dono_id: currentItem.user_id, resposta_seguranca: resposta, status: 'pendente'
-    }]);
-    if (error) alert(error.message);
-    else {
-        alert("Resposta enviada! Aguarde o dono aceitar.");
-        fecharModalConvite();
-    }
-}
-
-async function abrirModalPedidos() {
-    document.getElementById('modalPedidos').style.display = 'flex';
-    const { data } = await supabaseClient.from('solicitações_chat').select('*, requisitante_id(full_name)').eq('dono_id', currentUser.id).eq('status', 'pendente');
-    const lista = document.getElementById('listaPedidosPendentes');
-    lista.innerHTML = (data?.length > 0) ? data.map(p => `
-        <div style="margin-bottom:10px; padding:10px; background:rgba(255,255,255,0.05); border-radius:8px;">
-            <p><b>${p.requisitante_id?.full_name || 'Alguém'}</b> respondeu:</p>
-            <p>"${p.resposta_seguranca}"</p>
-            <button class="btn-save" onclick="aceitarPedido('${p.id}')">Aceitar</button>
-        </div>
-    `).join('') : '<p>Nada por aqui.</p>';
-}
-
-async function aceitarPedido(id) {
-    await supabaseClient.from('solicitações_chat').update({ status: 'aprovado' }).eq('id', id);
-    alert("Aceito! Chat liberado.");
-    location.reload();
-}
-
-// --- MODAIS ---
 function abrirModalAuth() { document.getElementById('modalAuth').style.display = 'flex'; }
 function fecharModalAuth() { document.getElementById('modalAuth').style.display = 'none'; }
 function fecharModalConvite() { document.getElementById('modalConvite').style.display = 'none'; }
-function fecharModalPost() {
-    document.getElementById('modalPost').style.display = 'none';
-}
+function fecharModalPost() { document.getElementById('modalPost').style.display = 'none'; }
 
 function abrirModalPost() {
     if (!currentUser) return abrirModalAuth();
@@ -313,3 +348,5 @@ function abrirModalPost() {
         mapaPost.invalidateSize();
     }, 400);
 }
+
+function fecharModal(id) { document.getElementById(id).style.display = 'none'; }
