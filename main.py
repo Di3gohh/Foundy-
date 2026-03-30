@@ -2,8 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
-from pydantic import BaseModel, Field
-from typing import Optional, List
+from pydantic import BaseModel
 from datetime import datetime
 from passlib.context import CryptContext
 
@@ -16,7 +15,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 # ==========================================
-# MODELOS DE TABELA (IDÊNTICO AO SEU SQL)
+# MODELOS DE TABELA
 # ==========================================
 
 class DBUsuario(Base):
@@ -27,7 +26,7 @@ class DBUsuario(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     cpf = Column(String, nullable=False)
     data_nascimento = Column(String, nullable=False)
-    senha_hash = Column(String, nullable=False) # Guardamos a senha criptografada
+    senha_hash = Column(String, nullable=False)
     telefone = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -100,7 +99,6 @@ def registrar_usuario(user: UsuarioCreate, db: Session = Depends(get_db)):
     if db.query(DBUsuario).filter(DBUsuario.email == user.email).first():
         raise HTTPException(status_code=400, detail="E-mail já cadastrado.")
     
-    # Criamos o hash da senha
     senha_segura = pwd_context.hash(user.senha)
     
     novo_usuario = DBUsuario(
@@ -136,7 +134,7 @@ def listar_itens(db: Session = Depends(get_db)):
 
 @app.post("/api/itens")
 def criar_item(item: ItemCreate, db: Session = Depends(get_db)):
-    db_item = DBItem(**item.dict())
+    db_item = DBItem(**item.model_dump()) # Usando model_dump para evitar erros
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
