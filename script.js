@@ -1,4 +1,4 @@
-const API_URL = 'http://127.0.0.1:8000/api';
+const API_URL = 'https://foundy-backend.onrender.com/api';
 let currentUser = null;
 let itensCadastrados = [];
 let isLoginMode = false;
