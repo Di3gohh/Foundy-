@@ -62,11 +62,12 @@
         <section class="map-section">
             <div class="map-container">
                 <button class="btn-gps" onclick="minhaLocalizacao()" title="Onde estou?">📍 Meu Local</button>
-                <div id="mapaPrincipal" style="height: 450px; width: 100%; border-radius: 16px;"></div>
+                <div id="mapaPrincipal"></div>
             </div>
         </section>
 
-        <div class="grid-items" id="itemGrid"></div>
+        <div class="grid-items" id="itemGrid">
+            </div>
     </main>
 
     <div id="modalPedidos" class="modal">
@@ -117,7 +118,7 @@
                 <button class="close-btn" onclick="fecharModalPost()">&times;</button>
             </div>
             <div class="upload-zone" onclick="document.getElementById('fotoItem').click()">
-                <img id="preview" src="" style="display:none; width: 100%; border-radius: 10px; margin-bottom: 10px;" alt="Preview da foto">
+                <img id="preview" src="" style="display:none; width: 100%; border-radius: 10px; margin-bottom: 10px;" alt="Preview">
                 <div id="uploadPlaceholder">📸 Clique para tirar foto ou upload</div>
             </div>
             <input type="file" id="fotoItem" accept="image/*" onchange="analisarFoto(event)" style="display:none">
@@ -159,17 +160,17 @@
 
     <div id="modalChat" class="modal">
         <div class="modal-content chat-container">
-            <div class="chat-header">
+            <div class="chat-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 10px;">
                 <div style="display:flex; align-items:center; gap:10px;">
                     <div id="statusOnline" class="status-dot"></div>
                     <h4 id="chatPartner">Conversa</h4>
                 </div>
                 <button onclick="fecharChat()" style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer" aria-label="Fechar Chat">&times;</button>
             </div>
-            <div id="chatMessages" class="chat-messages"></div>
-            <div class="chat-input-area">
+            <div id="chatMessages" class="chat-messages" style="height: 300px; overflow-y: auto;"></div>
+            <div class="chat-input-area" style="display: flex; gap: 10px; margin-top: 10px;">
                 <input type="text" id="msgInput" placeholder="Escreva sua mensagem...">
-                <button id="btnEnviarMsg" onclick="enviarMensagemReal()" class="btn-send">➡️</button>
+                <button id="btnEnviarMsg" onclick="enviarMensagemReal()" class="btn-send" style="background: var(--primary); border: none; padding: 10px; border-radius: 8px; cursor: pointer;">➡️</button>
             </div>
         </div>
     </div>
