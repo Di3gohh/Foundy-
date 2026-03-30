@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+opencv-python-headless
+numpy
+pytesseract
+passlib[bcrypt]
+python-multipart
