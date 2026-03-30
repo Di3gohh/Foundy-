@@ -13,7 +13,7 @@
 
     <nav class="navbar">
         <div class="nav-left">
-            <div class="logo">FOUNDY<span>.</span></div>
+            <div class="logo" onclick="location.reload()">FOUNDY<span>.</span></div>
         </div>
         
         <div class="search-box">
@@ -22,8 +22,8 @@
         
         <div class="nav-right" id="navRightPanel">
             <div class="notif-container">
-                <button id="btnNotificacoes" class="btn-icon" onclick="toggleNotif()" style="background:none; border:none; font-size:1.4rem; cursor:pointer; position:relative;">
-                    🔔 <span id="badgeNotificacao" class="badge" style="position:absolute; top:0; right:0; background:red; color:white; border-radius:50%; font-size:0.6rem; padding:2px 5px; display:none;">0</span>
+                <button id="btnNotificacoes" class="btn-icon" onclick="toggleNotif()">
+                    🔔 <span id="badgeNotificacao" class="badge" style="display:none;">0</span>
                 </button>
                 <div id="notifDropdown" class="dropdown-content">
                     <p style="padding:10px; color:gray; text-align:center;">Sem notificações</p>
@@ -59,7 +59,7 @@
         <section class="map-section">
             <div class="map-container">
                 <button class="btn-gps" onclick="minhaLocalizacao()" title="Onde estou?">📍 Meu Local</button>
-                <div id="mapaPrincipal"></div>
+                <div id="mapaPrincipal" style="height: 450px; width: 100%; border-radius: 16px;"></div>
             </div>
         </section>
 
