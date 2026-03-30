@@ -138,17 +138,21 @@
     </div>
 
     <div id="modalConvite" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Solicitar Resgate</h3>
-                <button class="close-btn" onclick="fecharModalConvite()">&times;</button>
-            </div>
-            <p>Responda para abrir o chat:</p>
-            <blockquote id="perguntaExibida" class="quote-box"></blockquote>
-            <textarea id="respostaConvite" placeholder="Sua resposta aqui..."></textarea>
-            <button class="btn-save" onclick="enviarPedidoChat()">Enviar Resposta</button>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Reivindicar Item</h3>
+            <span class="close-btn" onclick="fecharModalConvite()">&times;</span>
         </div>
+        <div class="quote-box">
+            <p><strong>Pergunta do dono:</strong></p>
+            <p id="perguntaExibida">Carregando pergunta...</p>
+        </div>
+        <label class="label-info">Sua resposta/descrição:</label>
+        <textarea id="respostaSeguranca" placeholder="Descreva detalhes que só o dono saberia..."></textarea>
+        
+        <button class="btn-save" onclick="enviarPedidoChat()">Enviar Resposta</button>
     </div>
+</div>
 
     <div id="modalChat" class="modal">
         <div class="modal-content chat-container">

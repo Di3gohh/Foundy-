@@ -343,41 +343,91 @@ function toggleNotif() {
 }
 
 // --- MODAIS E CONTROLES ---
+
+/**
+ * Abre o modal de verificação para o interessado responder a pergunta
+ */
 function abrirVerificacao(id) {
     if (!currentUser) return abrirModalAuth();
+    
     currentItem = itensCadastrados.find(i => i.id === id);
     
+    if (!currentItem) return;
+
+    // Se o usuário for o dono do item
     if (currentItem.user_id === currentUser.id) {
-        alert("Este item foi postado por você. Verifique suas notificações para responder interessados.");
+        alert("Este item foi postado por você. Verifique suas notificações no sininho para responder interessados.");
         return;
     }
 
-    document.getElementById('perguntaExibida').innerText = currentItem.pergunta;
+    // Preenche a pergunta de segurança definida pelo dono
+    const campoPergunta = document.getElementById('perguntaExibida');
+    if (campoPergunta) campoPergunta.innerText = currentItem.pergunta;
+    
     document.getElementById('modalConvite').style.display = 'flex';
 }
 
-function abrirModalAuth() { document.getElementById('modalAuth').style.display = 'flex'; }
+/**
+ * Envia a resposta do interessado para o dono do item (Backend Python)
+ */
+async function enviarPedidoChat() {
+    // 1. Captura a resposta digitada
+    const campoResposta = document.getElementById('respostaSeguranca');
+    const respostaTexto = campoResposta?.value.trim();
+    
+    if (!respostaTexto) {
+        alert("Por favor, descreva o item ou responda à pergunta para continuar.");
+        return;
+    }
+
+    if (!currentItem) {
+        alert("Erro: Item não selecionado. Tente novamente.");
+        return;
+    }
+
+    // 2. Monta o payload conforme esperado pelo seu Backend Python
+    const payload = {
+        item_id: currentItem.id,
+        owner_id: currentItem.user_id, // Informação crucial para o servidor
+        requester_id: currentUser.id,
+        requester_name: currentUser.user_metadata.full_name || "Usuário Interessado",
+        answer: respostaTexto
+    };
+
+    try {
+        const btn = document.querySelector('#modalConvite .btn-save');
+        btn.disabled = true;
+        btn.innerText = "Enviando...";
+
+        // 3. Chamada para a API
+        const response = await fetch(`${API_URL}/notifications`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || "Erro ao enviar pedido.");
+        }
+
+        // 4. Feedback e Limpeza
+        alert("Solicitação enviada com sucesso! O dono do item analisará sua resposta.");
+        
+        campoResposta.value = "";
+        fecharModalConvite();
+        
+    } catch (err) {
+        console.error("Erro na solicitação:", err);
+        alert("Falha ao enviar: " + err.message);
+    } finally {
+        const btn = document.querySelector('#modalConvite .btn-save');
+        btn.disabled = false;
+        btn.innerText = "Enviar Resposta";
+    }
+}
+
+// Funções de fechamento (Garanta que estão no seu arquivo)
 function fecharModalAuth() { document.getElementById('modalAuth').style.display = 'none'; }
 function fecharModalConvite() { document.getElementById('modalConvite').style.display = 'none'; }
 function fecharModalPost() { document.getElementById('modalPost').style.display = 'none'; }
-
-function abrirModalPost() {
-    if (!currentUser) return abrirModalAuth();
-    document.getElementById('modalPost').style.display = 'flex';
-    
-    setTimeout(() => {
-        if (!mapaPost) {
-            mapaPost = L.map('mapaPost').setView([-23.55, -46.63], 13);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(mapaPost);
-            
-            mapaPost.on('click', e => {
-                if (markerPost) mapaPost.removeLayer(markerPost);
-                markerPost = L.marker(e.latlng).addTo(mapaPost);
-                document.getElementById('latLogItem').value = JSON.stringify(e.latlng);
-            });
-        }
-        mapaPost.invalidateSize();
-    }, 400);
-}
-
-function fecharModal(id) { document.getElementById(id).style.display = 'none'; }
