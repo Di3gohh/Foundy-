@@ -1,15 +1,13 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey
-from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 from passlib.context import CryptContext
-import base64
-import os
 
-# CONFIGURAÇÃO DE SEGURANÇA
+# CONFIGURAÇÃO DE SEGURANÇA PARA SENHAS
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./foundy.db"
@@ -18,18 +16,19 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 # ==========================================
-# MODELOS DE TABELA (SQLITE)
+# MODELOS DE TABELA (IDÊNTICO AO SEU SQL)
 # ==========================================
 
 class DBUsuario(Base):
     __tablename__ = "usuarios"
+    
     id = Column(Integer, primary_key=True, index=True)
-    nome = Column(String)
-    email = Column(String, unique=True, index=True)
-    senha_hash = Column(String)
-    cpf = Column(String)
-    telefone = Column(String)
-    data_nascimento = Column(String)
+    nome = Column(String, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
+    cpf = Column(String, nullable=False)
+    data_nascimento = Column(String, nullable=False)
+    senha_hash = Column(String, nullable=False) # Guardamos a senha criptografada
+    telefone = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class DBItem(Base):
@@ -41,34 +40,23 @@ class DBItem(Base):
     pergunta = Column(String)
     lat = Column(Float)
     lng = Column(Float)
-    user_id = Column(Integer, ForeignKey("usuarios.id")) # Relacionado ao ID do SQLite
+    user_id = Column(Integer, ForeignKey("usuarios.id"))
     usuario_nome = Column(String)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-class DBNotification(Base):
-    __tablename__ = "notifications"
-    id = Column(Integer, primary_key=True, index=True)
-    sender_id = Column(Integer)
-    sender_name = Column(String)
-    receiver_id = Column(Integer, ForeignKey("usuarios.id"))
-    item_id = Column(Integer, ForeignKey("itens.id"))
-    message = Column(String)
-    status = Column(String, default="pending")
     created_at = Column(DateTime, default=datetime.utcnow)
 
 Base.metadata.create_all(bind=engine)
 
 # ==========================================
-# SCHEMAS (VALIDAÇÃO)
+# SCHEMAS DE VALIDAÇÃO (PYDANTIC)
 # ==========================================
 
 class UsuarioCreate(BaseModel):
     nome: str
     email: str
-    senha: str
     cpf: str
-    telefone: Optional[str] = None
     data_nascimento: str
+    senha: str
+    telefone: str
 
 class UsuarioLogin(BaseModel):
     email: str
@@ -85,41 +73,63 @@ class ItemCreate(BaseModel):
     usuario_nome: str
 
 # ==========================================
-# ROTAS DA API
+# APP E ROTAS
 # ==========================================
 
 app = FastAPI()
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def get_db():
     db = SessionLocal()
-    try: yield db
-    finally: db.close()
+    try:
+        yield db
+    finally:
+        db.close()
 
-# --- AUTH ---
+# --- ROTAS DE AUTENTICAÇÃO ---
+
 @app.post("/api/usuarios/registrar")
-def registrar(user: UsuarioCreate, db: Session = Depends(get_db)):
+def registrar_usuario(user: UsuarioCreate, db: Session = Depends(get_db)):
     if db.query(DBUsuario).filter(DBUsuario.email == user.email).first():
         raise HTTPException(status_code=400, detail="E-mail já cadastrado.")
     
-    novo_user = DBUsuario(
-        nome=user.nome, email=user.email,
-        senha_hash=pwd_context.hash(user.senha),
-        cpf=user.cpf, telefone=user.telefone,
-        data_nascimento=user.data_nascimento
+    # Criamos o hash da senha
+    senha_segura = pwd_context.hash(user.senha)
+    
+    novo_usuario = DBUsuario(
+        nome=user.nome,
+        email=user.email,
+        cpf=user.cpf,
+        data_nascimento=user.data_nascimento,
+        senha_hash=senha_segura,
+        telefone=user.telefone
     )
-    db.add(novo_user)
+    db.add(novo_usuario)
     db.commit()
-    return {"status": "sucesso"}
+    return {"status": "Sucesso", "mensagem": "Usuário cadastrado!"}
 
 @app.post("/api/usuarios/login")
-def login(cred: UsuarioLogin, db: Session = Depends(get_db)):
+def login_usuario(cred: UsuarioLogin, db: Session = Depends(get_db)):
     user = db.query(DBUsuario).filter(DBUsuario.email == cred.email).first()
+    
     if not user or not pwd_context.verify(cred.senha, user.senha_hash):
-        raise HTTPException(status_code=401, detail="Credenciais inválidas")
-    return {"id": user.id, "nome": user.nome, "email": user.email}
+        raise HTTPException(status_code=401, detail="E-mail ou senha incorretos.")
+    
+    return {
+        "id": user.id,
+        "nome": user.nome,
+        "email": user.email
+    }
 
-# --- ITENS ---
+# --- ROTAS DE ITENS ---
+
 @app.get("/api/itens")
 def listar_itens(db: Session = Depends(get_db)):
     return db.query(DBItem).all()
