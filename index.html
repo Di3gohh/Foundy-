@@ -6,7 +6,10 @@
     <title>Foundy | O que se perdeu, volta.</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;800&display=swap" rel="stylesheet">
+    
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -22,7 +25,7 @@
         
         <div class="nav-right" id="navRightPanel">
             <div class="notif-container">
-                <button id="btnNotificacoes" class="btn-icon" onclick="toggleNotif()">
+                <button id="btnNotificacoes" class="btn-icon" onclick="toggleNotif()" aria-label="Notificações">
                     🔔 <span id="badgeNotificacao" class="badge" style="display:none;">0</span>
                 </button>
                 <div id="notifDropdown" class="dropdown-content">
@@ -114,7 +117,7 @@
                 <button class="close-btn" onclick="fecharModalPost()">&times;</button>
             </div>
             <div class="upload-zone" onclick="document.getElementById('fotoItem').click()">
-                <img id="preview" src="" style="display:none; width: 100%; border-radius: 10px; margin-bottom: 10px;">
+                <img id="preview" src="" style="display:none; width: 100%; border-radius: 10px; margin-bottom: 10px;" alt="Preview da foto">
                 <div id="uploadPlaceholder">📸 Clique para tirar foto ou upload</div>
             </div>
             <input type="file" id="fotoItem" accept="image/*" onchange="analisarFoto(event)" style="display:none">
@@ -138,21 +141,21 @@
     </div>
 
     <div id="modalConvite" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Reivindicar Item</h3>
-            <span class="close-btn" onclick="fecharModalConvite()">&times;</span>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Reivindicar Item</h3>
+                <button class="close-btn" onclick="fecharModalConvite()">&times;</button>
+            </div>
+            <div class="quote-box">
+                <p><strong>Pergunta do dono:</strong></p>
+                <p id="perguntaExibida">Carregando pergunta...</p>
+            </div>
+            <label class="label-info" for="respostaSeguranca">Sua resposta/descrição:</label>
+            <textarea id="respostaSeguranca" placeholder="Descreva detalhes que só o dono saberia..."></textarea>
+            
+            <button class="btn-save" onclick="enviarPedidoChat()">Enviar Resposta</button>
         </div>
-        <div class="quote-box">
-            <p><strong>Pergunta do dono:</strong></p>
-            <p id="perguntaExibida">Carregando pergunta...</p>
-        </div>
-        <label class="label-info">Sua resposta/descrição:</label>
-        <textarea id="respostaSeguranca" placeholder="Descreva detalhes que só o dono saberia..."></textarea>
-        
-        <button class="btn-save" onclick="enviarPedidoChat()">Enviar Resposta</button>
     </div>
-</div>
 
     <div id="modalChat" class="modal">
         <div class="modal-content chat-container">
@@ -161,7 +164,7 @@
                     <div id="statusOnline" class="status-dot"></div>
                     <h4 id="chatPartner">Conversa</h4>
                 </div>
-                <button onclick="fecharChat()" style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer">&times;</button>
+                <button onclick="fecharChat()" style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer" aria-label="Fechar Chat">&times;</button>
             </div>
             <div id="chatMessages" class="chat-messages"></div>
             <div class="chat-input-area">

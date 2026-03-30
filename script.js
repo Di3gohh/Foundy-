@@ -109,6 +109,10 @@ function itensFiltrados() {
 }
 
 // --- AUTENTICAÇÃO (SUPABASE) ---
+function abrirModalAuth() {
+    document.getElementById('modalAuth').style.display = 'flex';
+}
+
 function toggleAuthMode() {
     isLoginMode = !isLoginMode;
     document.getElementById('authTitle').innerText = isLoginMode ? "Entrar na Conta" : "Criar Conta Foundy";
@@ -178,8 +182,8 @@ async function sairConta() {
 function calcularKarma() {
     if (!currentUser) return;
     const meusItens = itensCadastrados.filter(i => i.user_id === currentUser.id);
-    const valKarma = document.getElementById('valKarma');
-    if(valKarma) valKarma.innerText = meusItens.length * 10;
+    const valKarmaDisplay = document.getElementById('valKarma');
+    if(valKarmaDisplay) valKarmaDisplay.innerText = meusItens.length * 10;
     document.getElementById('karmaDisplay').style.display = 'block';
 }
 
@@ -206,7 +210,6 @@ function initMapaPrincipal() {
 function atualizarMarkersMapa() {
     if (!mapaPrincipal) return;
     
-    // Remove markers antigos com segurança
     mapaPrincipal.eachLayer(l => { 
         if (l instanceof L.Marker) mapaPrincipal.removeLayer(l); 
     });
@@ -228,6 +231,25 @@ function minhaLocalizacao() {
 }
 
 // --- POSTAGEM ---
+function abrirModalPost() {
+    if (!currentUser) return abrirModalAuth();
+    document.getElementById('modalPost').style.display = 'flex';
+    
+    setTimeout(() => {
+        if (!mapaPost) {
+            mapaPost = L.map('mapaPost').setView([-23.55, -46.63], 13);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(mapaPost);
+            
+            mapaPost.on('click', (e) => {
+                if (markerPost) mapaPost.removeLayer(markerPost);
+                markerPost = L.marker(e.latlng).addTo(mapaPost);
+                document.getElementById('latLogItem').value = JSON.stringify(e.latlng);
+            });
+        }
+        mapaPost.invalidateSize();
+    }, 300);
+}
+
 function analisarFoto(e) {
     const file = e.target.files[0];
     if (file) {
@@ -287,8 +309,9 @@ async function salvarPost() {
         location.reload();
     } catch (err) { 
         alert("Erro: " + err.message); 
-        document.getElementById('btnPublish').disabled = false;
-        document.getElementById('btnPublish').innerText = "Publicar Agora";
+        const btn = document.getElementById('btnPublish');
+        btn.disabled = false;
+        btn.innerText = "Publicar Agora";
     }
 }
 
@@ -297,6 +320,7 @@ async function checkNotifications() {
     if (!currentUser) return;
     try {
         const res = await fetch(`${API_URL}/notifications/${currentUser.id}`);
+        if (!res.ok) return;
         const data = await res.json();
         
         const badge = document.getElementById('badgeNotificacao');
@@ -309,6 +333,7 @@ async function checkNotifications() {
             dropdown.innerHTML = data.map(n => `
                 <div class="notif-item" style="padding:10px; border-bottom:1px solid #eee;">
                     <p style="font-size:0.9rem;"><b>${n.sender_name}</b> quer falar sobre um item.</p>
+                    <p style="font-size:0.8rem; color:gray; font-style:italic">"${n.message}"</p>
                     <div style="display:flex; gap:5px; margin-top:5px;">
                         <button class="btn-save" style="padding:4px 8px; font-size:11px" onclick="responderNotificacao(${n.id}, 'accepted')">Aceitar</button>
                         <button class="btn-outline" style="padding:4px 8px; font-size:11px" onclick="responderNotificacao(${n.id}, 'rejected')">Recusar</button>
@@ -344,9 +369,6 @@ function toggleNotif() {
 
 // --- MODAIS E CONTROLES ---
 
-/**
- * Abre o modal de verificação para o interessado responder a pergunta
- */
 function abrirVerificacao(id) {
     if (!currentUser) return abrirModalAuth();
     
@@ -354,24 +376,18 @@ function abrirVerificacao(id) {
     
     if (!currentItem) return;
 
-    // Se o usuário for o dono do item
     if (currentItem.user_id === currentUser.id) {
         alert("Este item foi postado por você. Verifique suas notificações no sininho para responder interessados.");
         return;
     }
 
-    // Preenche a pergunta de segurança definida pelo dono
     const campoPergunta = document.getElementById('perguntaExibida');
     if (campoPergunta) campoPergunta.innerText = currentItem.pergunta;
     
     document.getElementById('modalConvite').style.display = 'flex';
 }
 
-/**
- * Envia a resposta do interessado para o dono do item (Backend Python)
- */
 async function enviarPedidoChat() {
-    // 1. Captura a resposta digitada
     const campoResposta = document.getElementById('respostaSeguranca');
     const respostaTexto = campoResposta?.value.trim();
     
@@ -385,10 +401,9 @@ async function enviarPedidoChat() {
         return;
     }
 
-    // 2. Monta o payload conforme esperado pelo seu Backend Python
     const payload = {
         item_id: currentItem.id,
-        owner_id: currentItem.user_id, // Informação crucial para o servidor
+        owner_id: currentItem.user_id,
         requester_id: currentUser.id,
         requester_name: currentUser.user_metadata.full_name || "Usuário Interessado",
         answer: respostaTexto
@@ -399,7 +414,6 @@ async function enviarPedidoChat() {
         btn.disabled = true;
         btn.innerText = "Enviando...";
 
-        // 3. Chamada para a API
         const response = await fetch(`${API_URL}/notifications`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -411,9 +425,7 @@ async function enviarPedidoChat() {
             throw new Error(errorData.detail || "Erro ao enviar pedido.");
         }
 
-        // 4. Feedback e Limpeza
         alert("Solicitação enviada com sucesso! O dono do item analisará sua resposta.");
-        
         campoResposta.value = "";
         fecharModalConvite();
         
@@ -422,12 +434,16 @@ async function enviarPedidoChat() {
         alert("Falha ao enviar: " + err.message);
     } finally {
         const btn = document.querySelector('#modalConvite .btn-save');
-        btn.disabled = false;
-        btn.innerText = "Enviar Resposta";
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = "Enviar Resposta";
+        }
     }
 }
 
-// Funções de fechamento (Garanta que estão no seu arquivo)
+// Funções de fechamento
 function fecharModalAuth() { document.getElementById('modalAuth').style.display = 'none'; }
 function fecharModalConvite() { document.getElementById('modalConvite').style.display = 'none'; }
 function fecharModalPost() { document.getElementById('modalPost').style.display = 'none'; }
+function fecharModal(id) { document.getElementById(id).style.display = 'none'; }
+function fecharChat() { document.getElementById('modalChat').style.display = 'none'; }
