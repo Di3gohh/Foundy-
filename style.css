@@ -34,7 +34,7 @@ body {
     align-items: center; 
     flex-wrap: wrap;
     padding: 1rem 5%; 
-    background: rgba(11, 15, 26, 0.8);
+    background: rgba(11, 15, 26, 0.9);
     backdrop-filter: blur(12px); 
     border-bottom: 1px solid var(--border);
     position: sticky; 
@@ -117,9 +117,14 @@ button { transition: 0.2s ease; cursor: pointer; border: none; }
     font-size: 1rem;
 }
 
-.btn-save:hover { 
+.btn-save:hover:not(:disabled) { 
     background: var(--primary-hover); 
     box-shadow: 0 4px 15px rgba(45, 212, 191, 0.2); 
+}
+
+.btn-save:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 /* Hero & Filtros */
@@ -184,22 +189,34 @@ button { transition: 0.2s ease; cursor: pointer; border: none; }
 .card-content h3 { font-size: 1.2rem; margin-bottom: 15px; color: white; }
 
 /* Mapas */
-.map-section { padding: 0 5%; margin-bottom: 40px; }
-.map-container { position: relative; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
-#mapaPrincipal { width: 100%; height: 450px; z-index: 1; }
-#mapaPost { width: 100%; height: 250px; border-radius: 12px; margin: 10px 0; border: 1px solid var(--border); }
+.map-section { padding: 0 5% 40px; }
 
-.btn-gps { 
-    position: absolute; 
-    bottom: 20px; 
-    right: 20px; 
-    z-index: 1000; 
-    background: var(--card); 
-    color: white; 
-    padding: 12px; 
-    border-radius: 12px; 
-    box-shadow: var(--shadow); 
+.map-container { 
+    position: relative; 
+    border-radius: var(--radius); 
+    overflow: hidden; 
     border: 1px solid var(--border);
+    min-height: 450px;
+    background: #101420;
+}
+
+#mapaPrincipal { 
+    width: 100%; 
+    height: 450px; 
+    z-index: 1;
+}
+
+.btn-gps {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 100;
+    background: white;
+    color: black;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
 }
 
 /* Modais */
@@ -231,6 +248,18 @@ button { transition: 0.2s ease; cursor: pointer; border: none; }
 .modal-header { margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; }
 .close-btn { font-size: 2rem; color: var(--text-muted); cursor: pointer; background: none; border: none; }
 
+/* Upload Area */
+.upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    margin-bottom: 15px;
+    transition: 0.2s;
+}
+.upload-zone:hover { border-color: var(--primary); background: rgba(45, 212, 191, 0.05); }
+
 /* Formulários */
 input, select, textarea { 
     width: 100%; 
@@ -258,45 +287,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); backgr
     margin-bottom: 15px;
 }
 
-/* Chat Moderno */
-.chat-container { height: 80vh; max-height: 700px; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
-.chat-messages { 
-    flex-grow: 1; 
-    overflow-y: auto; 
-    padding: 20px; 
-    display: flex; 
-    flex-direction: column; 
-    gap: 10px; 
-    background: rgba(0,0,0,0.1); 
-}
-.chat-input-area { 
-    padding: 20px; 
-    background: var(--card); 
-    border-top: 1px solid var(--border); 
-    display: flex; 
-    gap: 10px; 
-    align-items: center; 
-}
-.chat-input-area input { margin-bottom: 0; border-radius: 99px; }
-
-/* Notificações (Sininho e Dropdown) */
+/* Chat e Notificações */
 .notif-container { position: relative; }
+.btn-icon { background: none; border: none; cursor: pointer; position: relative; font-size: 1.4rem; }
 
-.btn-icon {
-    position: relative;
-    background: var(--card);
-    border: 1px solid var(--border);
-    color: var(--text);
-    width: 42px;
-    height: 42px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.2rem;
-}
-
-.badge, #badgeNotificacao {
+.badge {
     position: absolute;
     top: -2px;
     right: -2px;
@@ -306,43 +301,26 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); backgr
     font-weight: 800;
     min-width: 18px;
     height: 18px;
-    border-radius: 10px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     border: 2px solid var(--bg);
-    animation: pulse-red 2s infinite;
 }
 
 .dropdown-content {
     display: none;
     position: absolute;
-    top: 50px;
+    top: 45px;
     right: 0;
     background: #1e1e1e;
-    min-width: 300px;
+    min-width: 280px;
     box-shadow: var(--shadow);
     border-radius: 12px;
     z-index: 1100;
     max-height: 400px;
     overflow-y: auto;
     border: 1px solid var(--border);
-}
-
-.notif-item {
-    padding: 15px;
-    border-bottom: 1px solid var(--border);
-    font-size: 0.9rem;
-    transition: 0.2s;
-}
-.notif-item:hover { background: rgba(255,255,255,0.02); }
-.notif-actions { display: flex; gap: 8px; margin-top: 10px; }
-
-/* Animações e Quote */
-@keyframes pulse-red {
-    0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-    70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
 }
 
 .quote-box {
@@ -359,8 +337,6 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); backgr
     .navbar { padding: 15px 5%; }
     .search-box { order: 3; width: 100%; max-width: none; }
     .nav-right { width: 100%; justify-content: space-between; }
-    .modal-content { padding: 20px; border-radius: 0; height: 100%; max-height: 100vh; }
-    .modal { padding: 0; }
+    .modal-content { padding: 20px; border-radius: 16px; width: 95%; }
     .hero { padding: 40px 20px; }
-    .dropdown-content { position: fixed; top: 70px; left: 5%; right: 5%; min-width: 0; }
 }

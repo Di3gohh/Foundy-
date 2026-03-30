@@ -17,8 +17,9 @@ let isLoginMode = false;
 
 // --- INICIALIZAÇÃO ---
 window.addEventListener('DOMContentLoaded', async () => {
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    currentUser = user;
+    // Tenta recuperar sessão existente
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    currentUser = session ? session.user : null;
     
     await carregarItens();
     atualizarUI();
@@ -39,9 +40,16 @@ async function carregarItens() {
         
         itensCadastrados = await response.json();
         renderizarCards();
-        initMapaPrincipal();
+        
+        // Timeout para garantir que o DOM renderizou a div antes do mapa
+        setTimeout(() => {
+            initMapaPrincipal();
+        }, 300);
+        
     } catch (err) {
         console.error("Erro ao carregar itens:", err);
+        // Tenta iniciar o mapa vazio para não quebrar a UI
+        initMapaPrincipal();
     }
 }
 
@@ -156,9 +164,9 @@ function atualizarUI() {
     const authArea = document.getElementById('authArea');
     const btnSino = document.getElementById('btnNotificacoes');
     if (currentUser && authArea) {
-        const nome = currentUser.user_metadata.full_name?.split(' ')[0] || "Usuário";
+        const nome = currentUser.user_metadata?.full_name?.split(' ')[0] || "Usuário";
         authArea.innerHTML = `<span>Olá, <b style="color:var(--primary)">${nome}</b></span> <button onclick="sairConta()" class="btn-outline" style="padding:4px 8px; font-size:10px; margin-left:10px">Sair</button>`;
-        if (btnSino) btnSino.style.display = 'flex';
+        if (btnSino) btnSino.parentElement.style.display = 'block';
     }
 }
 
@@ -178,21 +186,34 @@ function calcularKarma() {
 // --- MAPAS (LEAFLET) ---
 function initMapaPrincipal() {
     if (mapaPrincipal) return;
+
+    const container = document.getElementById('mapaPrincipal');
+    if (!container) return;
+
     mapaPrincipal = L.map('mapaPrincipal').setView([-23.55, -46.63], 13);
+    
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         attribution: '© OpenStreetMap'
     }).addTo(mapaPrincipal);
+
+    setTimeout(() => {
+        mapaPrincipal.invalidateSize();
+    }, 500);
+
     atualizarMarkersMapa();
 }
 
 function atualizarMarkersMapa() {
     if (!mapaPrincipal) return;
-    // Remove markers antigos
-    mapaPrincipal.eachLayer(l => { if (l instanceof L.Marker) mapaPrincipal.removeLayer(l); });
+    
+    // Remove markers antigos com segurança
+    mapaPrincipal.eachLayer(l => { 
+        if (l instanceof L.Marker) mapaPrincipal.removeLayer(l); 
+    });
     
     itensFiltrados().forEach(item => {
         L.marker([item.lat, item.lng]).addTo(mapaPrincipal)
-         .bindPopup(`<b>${item.titulo}</b><br><button onclick="abrirVerificacao(${item.id})" style="cursor:pointer; margin-top:5px">Ver Detalhes</button>`);
+         .bindPopup(`<b>${item.titulo}</b><br><button onclick="abrirVerificacao(${item.id})" style="cursor:pointer; margin-top:5px; background:var(--primary); color:white; border:none; border-radius:4px; padding:2px 8px;">Ver Detalhes</button>`);
     });
 }
 
@@ -201,7 +222,7 @@ function minhaLocalizacao() {
         navigator.geolocation.getCurrentPosition(p => {
             const pos = [p.coords.latitude, p.coords.longitude];
             mapaPrincipal.setView(pos, 15);
-            L.circle(pos, {radius: 200}).addTo(mapaPrincipal);
+            L.circle(pos, {radius: 200, color: '#4F46E5'}).addTo(mapaPrincipal);
         }, () => alert("Por favor, ative a localização no navegador."));
     }
 }
@@ -230,17 +251,16 @@ async function salvarPost() {
     const localRaw = document.getElementById('latLogItem').value;
     const previewImg = document.getElementById('preview').src;
 
-    if (!titulo || !localRaw || !previewImg || categoria === "Outros") {
-        return alert("Preencha todos os campos, selecione a categoria e marque o local no mapa!");
+    if (!titulo || !localRaw || !previewImg || categoria === "Outros" || !pergunta) {
+        return alert("Preencha todos os campos, incluindo a pergunta de segurança e o local no mapa!");
     }
 
     const coords = JSON.parse(localRaw);
-
     const payload = {
         titulo,
         categoria,
         pergunta,
-        foto: previewImg, // Enviando Base64 para o Python processar a censura
+        foto: previewImg, 
         lat: coords.lat,
         lng: coords.lng,
         user_id: currentUser.id,
@@ -248,18 +268,27 @@ async function salvarPost() {
     };
 
     try {
+        const btn = document.getElementById('btnPublish');
+        btn.disabled = true;
+        btn.innerText = "Publicando...";
+
         const response = await fetch(`${API_URL}/itens`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
 
-        if (!response.ok) throw new Error("Erro ao salvar no servidor.");
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || "Erro ao salvar no servidor.");
+        }
         
         alert("Item publicado com sucesso!");
         location.reload();
     } catch (err) { 
         alert("Erro: " + err.message); 
+        document.getElementById('btnPublish').disabled = false;
+        document.getElementById('btnPublish').innerText = "Publicar Agora";
     }
 }
 
@@ -275,14 +304,14 @@ async function checkNotifications() {
         
         if (data && data.length > 0) {
             badge.innerText = data.length;
-            badge.style.display = 'flex';
+            badge.style.display = 'inline-block';
             
             dropdown.innerHTML = data.map(n => `
-                <div class="notif-item" style="padding:10px; border-bottom:1px solid #333;">
-                    <p><b>${n.sender_name}</b> quer falar sobre um item.</p>
+                <div class="notif-item" style="padding:10px; border-bottom:1px solid #eee;">
+                    <p style="font-size:0.9rem;"><b>${n.sender_name}</b> quer falar sobre um item.</p>
                     <div style="display:flex; gap:5px; margin-top:5px;">
-                        <button class="btn-save" style="padding:2px 8px; font-size:11px" onclick="responderNotificacao(${n.id}, 'accepted')">Aceitar</button>
-                        <button class="btn-outline" style="padding:2px 8px; font-size:11px" onclick="responderNotificacao(${n.id}, 'rejected')">Recusar</button>
+                        <button class="btn-save" style="padding:4px 8px; font-size:11px" onclick="responderNotificacao(${n.id}, 'accepted')">Aceitar</button>
+                        <button class="btn-outline" style="padding:4px 8px; font-size:11px" onclick="responderNotificacao(${n.id}, 'rejected')">Recusar</button>
                     </div>
                 </div>
             `).join('');
@@ -313,13 +342,13 @@ function toggleNotif() {
     drop.style.display = (drop.style.display === 'block') ? 'none' : 'block';
 }
 
-// --- MODAIS E CHAT ---
+// --- MODAIS E CONTROLES ---
 function abrirVerificacao(id) {
     if (!currentUser) return abrirModalAuth();
     currentItem = itensCadastrados.find(i => i.id === id);
     
     if (currentItem.user_id === currentUser.id) {
-        alert("Este item foi postado por você.");
+        alert("Este item foi postado por você. Verifique suas notificações para responder interessados.");
         return;
     }
 
@@ -335,10 +364,12 @@ function fecharModalPost() { document.getElementById('modalPost').style.display 
 function abrirModalPost() {
     if (!currentUser) return abrirModalAuth();
     document.getElementById('modalPost').style.display = 'flex';
+    
     setTimeout(() => {
         if (!mapaPost) {
             mapaPost = L.map('mapaPost').setView([-23.55, -46.63], 13);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(mapaPost);
+            
             mapaPost.on('click', e => {
                 if (markerPost) mapaPost.removeLayer(markerPost);
                 markerPost = L.marker(e.latlng).addTo(mapaPost);
