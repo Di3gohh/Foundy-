@@ -1,12 +1,9 @@
 // --- CONFIGURAÇÃO ---
-const API_URL = 'https://foundy-taupe.vercel.app/api';
-const SUPABASE_URL = 'https://ndlpzprccxjpuxqtzrxl.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_94q7-RW5thyf7kBRUHDxBw_0bPPvRkX'; 
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const API_URL = 'http://127.0.0.1:8000/api'; // Altere para sua URL de produção quando necessário
 
-// --- ESTADO GLOBAL ---
+// --- ESTADO GLOBAL (Sem Supabase) ---
 let itensCadastrados = [];
-let currentUser = null;
+let currentUser = null; 
 let currentItem = null;
 let categoriaAtiva = "Todos";
 let termoBusca = "";
@@ -17,9 +14,11 @@ let isLoginMode = false;
 
 // --- INICIALIZAÇÃO ---
 window.addEventListener('DOMContentLoaded', async () => {
-    // Recupera sessão do Supabase
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    currentUser = session ? session.user : null;
+    // Recupera usuário do banco local do navegador
+    const userLogado = localStorage.getItem('foundy_user');
+    if (userLogado) {
+        currentUser = JSON.parse(userLogado);
+    }
     
     await carregarItens();
     atualizarUI();
@@ -27,38 +26,33 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (currentUser) {
         calcularKarma();
         checkNotifications();
-        // Polling de notificações (15s)
         setInterval(checkNotifications, 15000);
     }
 });
 
-// --- SISTEMA DE DADOS (API PYTHON) ---
+// --- SISTEMA DE DADOS (API PYTHON + SQLITE) ---
 async function carregarItens() {
     try {
         const response = await fetch(`${API_URL}/itens`);
-        if (!response.ok) throw new Error("Erro ao buscar itens da API");
+        if (!response.ok) throw new Error("Erro ao buscar itens");
         
         itensCadastrados = await response.json();
         renderizarCards();
         
-        setTimeout(() => {
-            initMapaPrincipal();
-        }, 300);
-        
+        setTimeout(() => { initMapaPrincipal(); }, 300);
     } catch (err) {
-        console.error("Erro ao carregar itens:", err);
-        initMapaPrincipal(); // Inicia mapa mesmo vazio
+        console.error("Erro:", err);
+        initMapaPrincipal();
     }
 }
 
 function renderizarCards() {
     const grid = document.getElementById('itemGrid');
     if (!grid) return;
-    
     const itens = itensFiltrados();
     
     if (itens.length === 0) {
-        grid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 40px;">Nenhum item encontrado.</p>`;
+        grid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: gray; padding: 40px;">Nenhum item encontrado.</p>`;
         return;
     }
 
@@ -69,7 +63,7 @@ function renderizarCards() {
         return `
             <div class="card">
                 <div class="card-image-container">
-                    <img src="${i.foto || 'https://via.placeholder.com/400x250?text=Sem+Foto'}" loading="lazy" alt="${i.titulo}">
+                    <img src="${i.foto || 'https://via.placeholder.com/400x250'}" alt="${i.titulo}">
                 </div>
                 <div class="card-content">
                     <small class="category-tag">${i.categoria}</small>
@@ -81,10 +75,102 @@ function renderizarCards() {
     }).join('');
 }
 
+// --- AUTENTICAÇÃO E VERIFICAÇÃO POR E-MAIL ---
+async function handleSignUp() {
+    const email = document.getElementById('regEmail').value.trim();
+    const password = document.getElementById('regPass').value;
+    const btn = document.getElementById('btnAuthSubmit');
+
+    if (!email || !password) return alert("Preencha e-mail e senha.");
+
+    try {
+        if (isLoginMode) {
+            // LOGIN NO SQLITE
+            btn.innerText = "Entrando...";
+            const res = await fetch(`${API_URL}/usuarios/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, senha: password })
+            });
+
+            if (!res.ok) throw new Error("E-mail ou senha incorretos.");
+            
+            const userData = await res.json();
+            localStorage.setItem('foundy_user', JSON.stringify({
+                id: userData.id,
+                user_metadata: { full_name: userData.nome }
+            }));
+            window.location.reload();
+
+        } else {
+            // CADASTRO COM CÓDIGO DE VERIFICAÇÃO
+            const nome = document.getElementById('regNome').value.trim();
+            const cpf = document.getElementById('regCpf').value.trim();
+            const phone = document.getElementById('regPhone').value;
+            const dataNasc = document.getElementById('regDataNasc').value;
+
+            if (!nome || !cpf) throw new Error("Nome e CPF são obrigatórios.");
+
+            btn.disabled = true;
+            btn.innerText = "Enviando código...";
+
+            // 1. Gerar Código
+            const codigoVerificacao = Math.floor(100000 + Math.random() * 900000).toString();
+
+            // 2. Enviar via EmailJS (Substitua pelos seus IDs)
+            await emailjs.send("service_id", "template_id", {
+                to_name: nome,
+                to_email: email,
+                codigo: codigoVerificacao
+            });
+
+            // 3. Validar Código
+            const inputCodigo = prompt(`Enviamos um código para ${email}. Digite-o abaixo:`);
+
+            if (inputCodigo === codigoVerificacao) {
+                // 4. Salvar no SQLite
+                const res = await fetch(`${API_URL}/usuarios/registrar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        nome, email, senha: password, cpf, telefone: phone, data_nascimento: dataNasc
+                    })
+                });
+
+                if (!res.ok) throw new Error("Erro ao salvar usuário.");
+
+                alert("Conta verificada com sucesso! Agora faça login.");
+                toggleAuthMode();
+            } else {
+                alert("Código incorreto. Tente novamente.");
+            }
+        }
+    } catch (err) {
+        alert(err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerText = isLoginMode ? "Entrar" : "Confirmar";
+    }
+}
+
+// --- UTILITÁRIOS DE UI ---
+function atualizarUI() {
+    const authArea = document.getElementById('authArea');
+    if (currentUser && authArea) {
+        const nome = currentUser.user_metadata.full_name.split(' ')[0];
+        authArea.innerHTML = `<span>Olá, <b>${nome}</b></span> <button onclick="sairConta()" class="btn-outline" style="padding:4px; font-size:10px">Sair</button>`;
+        document.getElementById('karmaDisplay').style.display = 'block';
+    }
+}
+
+async function sairConta() {
+    localStorage.removeItem('foundy_user');
+    window.location.reload();
+}
+
 // --- PESQUISA E FILTROS ---
 function buscarItens() {
-    const input = document.getElementById('inputPesquisa');
-    termoBusca = input ? input.value.toLowerCase() : "";
+    termoBusca = document.getElementById('inputPesquisa').value.toLowerCase();
     renderizarCards();
     atualizarMarkersMapa();
 }
@@ -92,8 +178,7 @@ function buscarItens() {
 function filtrarCategoria(cat) {
     categoriaAtiva = cat;
     document.querySelectorAll('.filter-btn').forEach(btn => {
-        const text = btn.innerText || btn.textContent;
-        btn.classList.toggle('active', text.includes(cat));
+        btn.classList.toggle('active', btn.innerText.includes(cat));
     });
     renderizarCards();
     atualizarMarkersMapa();
@@ -102,314 +187,65 @@ function filtrarCategoria(cat) {
 function itensFiltrados() {
     return itensCadastrados.filter(i => {
         const matchCat = categoriaAtiva === "Todos" || i.categoria === categoriaAtiva;
-        const matchBusca = i.titulo.toLowerCase().includes(termoBusca) || i.categoria.toLowerCase().includes(termoBusca);
+        const matchBusca = i.titulo.toLowerCase().includes(termoBusca);
         return matchCat && matchBusca;
     });
-}
-
-// --- AUTENTICAÇÃO (SUPABASE) ---
-function abrirModalAuth() {
-    const modal = document.getElementById('modalAuth');
-    if (modal) modal.style.display = 'flex';
-}
-
-function toggleAuthMode() {
-    isLoginMode = !isLoginMode;
-    document.getElementById('authTitle').innerText = isLoginMode ? "Entrar na Conta" : "Criar Conta Foundy";
-    document.getElementById('camposCadastroAdicionais').style.display = isLoginMode ? "none" : "block";
-    document.getElementById('btnAuthSubmit').innerText = isLoginMode ? "Entrar" : "Cadastrar e Confirmar E-mail";
-    document.getElementById('toggleAuth').innerText = isLoginMode ? "Não tem conta? Cadastre-se" : "Já tem conta? Entrar";
-}
-
-function verificarIdade() {
-    const dataNasc = document.getElementById('regDataNasc').value;
-    if (!dataNasc) return;
-    const hoje = new Date();
-    const nascimento = new Date(dataNasc);
-    let idade = hoje.getFullYear() - nascimento.getFullYear();
-    const m = hoje.getMonth() - nascimento.getMonth();
-    if (m < 0 || (m === 0 && hoje.getDate() < nascimento.getDate())) idade--;
-    document.getElementById('authResponsavel').style.display = (idade < 18) ? "block" : "none";
-}
-
-async function handleSignUp() {
-    const email = document.getElementById('regEmail').value.trim();
-    const password = document.getElementById('regPass').value;
-    if (!email || !password) return alert("E-mail e senha são obrigatórios.");
-
-    try {
-        if (isLoginMode) {
-            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) throw error;
-        } else {
-            const fullName = document.getElementById('regNome').value.trim();
-            const cpf = document.getElementById('regCpf').value.trim();
-            if (!fullName || !cpf) throw new Error("Preencha Nome e CPF.");
-
-            const { error } = await supabaseClient.auth.signUp({
-                email, password,
-                options: { 
-                    data: { 
-                        full_name: fullName, 
-                        cpf: cpf,
-                        phone: document.getElementById('regPhone').value,
-                        data_nascimento: document.getElementById('regDataNasc').value
-                    } 
-                }
-            });
-            if (error) throw error;
-            alert("Sucesso! Verifique seu e-mail.");
-        }
-        window.location.reload();
-    } catch (err) { alert(err.message); }
-}
-
-function atualizarUI() {
-    const authArea = document.getElementById('authArea');
-    const btnSino = document.getElementById('btnNotificacoes');
-    if (currentUser && authArea) {
-        const nome = currentUser.user_metadata?.full_name?.split(' ')[0] || "Usuário";
-        authArea.innerHTML = `<span>Olá, <b style="color:var(--primary)">${nome}</b></span> <button onclick="sairConta()" class="btn-outline" style="padding:4px 8px; font-size:10px; margin-left:10px">Sair</button>`;
-        if (btnSino) btnSino.parentElement.style.display = 'block';
-    }
-}
-
-async function sairConta() {
-    await supabaseClient.auth.signOut();
-    window.location.reload();
-}
-
-function calcularKarma() {
-    if (!currentUser) return;
-    const meusItens = itensCadastrados.filter(i => i.user_id === currentUser.id);
-    const valKarmaDisplay = document.getElementById('valKarma');
-    if(valKarmaDisplay) {
-        valKarmaDisplay.innerText = meusItens.length * 10;
-        document.getElementById('karmaDisplay').style.display = 'block';
-    }
 }
 
 // --- MAPAS (LEAFLET) ---
 function initMapaPrincipal() {
     if (mapaPrincipal) return;
-    const container = document.getElementById('mapaPrincipal');
-    if (!container) return;
-
     mapaPrincipal = L.map('mapaPrincipal').setView([-23.55, -46.63], 13);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '© OpenStreetMap'
-    }).addTo(mapaPrincipal);
-
-    setTimeout(() => { mapaPrincipal.invalidateSize(); }, 500);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(mapaPrincipal);
     atualizarMarkersMapa();
 }
 
 function atualizarMarkersMapa() {
     if (!mapaPrincipal) return;
     mapaPrincipal.eachLayer(l => { if (l instanceof L.Marker) mapaPrincipal.removeLayer(l); });
-    
     itensFiltrados().forEach(item => {
         L.marker([item.lat, item.lng]).addTo(mapaPrincipal)
-         .bindPopup(`<b>${item.titulo}</b><br><button onclick="abrirVerificacao(${item.id})" style="cursor:pointer; margin-top:5px; background:var(--primary); color:white; border:none; border-radius:4px; padding:2px 8px;">Ver Detalhes</button>`);
+         .bindPopup(`<b>${item.titulo}</b><br><button onclick="abrirVerificacao(${item.id})">Ver</button>`);
     });
 }
 
-function minhaLocalizacao() {
-    if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition(p => {
-            const pos = [p.coords.latitude, p.coords.longitude];
-            mapaPrincipal.setView(pos, 15);
-            L.circle(pos, {radius: 200, color: '#4F46E5'}).addTo(mapaPrincipal);
-        }, () => alert("Por favor, ative a localização no navegador."));
-    }
-}
-
 // --- POSTAGEM ---
-function abrirModalPost() {
-    if (!currentUser) return abrirModalAuth();
-    document.getElementById('modalPost').style.display = 'flex';
-    
-    setTimeout(() => {
-        if (!mapaPost) {
-            mapaPost = L.map('mapaPost').setView([-23.55, -46.63], 13);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(mapaPost);
-            mapaPost.on('click', (e) => {
-                if (markerPost) mapaPost.removeLayer(markerPost);
-                markerPost = L.marker(e.latlng).addTo(mapaPost);
-                document.getElementById('latLogItem').value = JSON.stringify(e.latlng);
-            });
-        }
-        mapaPost.invalidateSize();
-    }, 300);
-}
-
-function analisarFoto(e) {
-    const file = e.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            const prev = document.getElementById('preview');
-            prev.src = ev.target.result;
-            prev.style.display = 'block';
-            document.getElementById('uploadPlaceholder').style.display = 'none';
-        }
-        reader.readAsDataURL(file);
-    }
-}
-
 async function salvarPost() {
     if (!currentUser) return abrirModalAuth();
     
     const titulo = document.getElementById('tituloItem').value;
-    const categoria = document.getElementById('categoriaItem').value;
-    const pergunta = document.getElementById('perguntaSeguranca').value;
     const localRaw = document.getElementById('latLogItem').value;
     const previewImg = document.getElementById('preview').src;
 
-    if (!titulo || !localRaw || !previewImg || categoria === "Outros" || !pergunta) {
-        return alert("Preencha todos os campos, incluindo a pergunta de segurança e o local no mapa!");
-    }
+    if (!titulo || !localRaw || !previewImg) return alert("Preencha todos os campos e o local!");
 
     const coords = JSON.parse(localRaw);
     const payload = {
-        titulo, categoria, pergunta,
-        foto: previewImg, 
-        lat: coords.lat, lng: coords.lng,
+        titulo, 
+        categoria: document.getElementById('categoriaItem').value,
+        pergunta: document.getElementById('perguntaSeguranca').value,
+        foto: previewImg,
+        lat: coords.lat, 
+        lng: coords.lng,
         user_id: currentUser.id,
-        usuario_nome: currentUser.user_metadata.full_name || "Usuário Foundy"
+        usuario_nome: currentUser.user_metadata.full_name
     };
 
     try {
-        const btn = document.getElementById('btnPublish');
-        btn.disabled = true; btn.innerText = "Publicando...";
-
-        const response = await fetch(`${API_URL}/itens`, {
+        const res = await fetch(`${API_URL}/itens`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || "Erro ao salvar no servidor.");
-        }
-        
-        alert("Item publicado com sucesso!");
-        location.reload();
-    } catch (err) { 
-        alert("Erro: " + err.message); 
-        const btn = document.getElementById('btnPublish');
-        btn.disabled = false; btn.innerText = "Publicar Agora";
-    }
+        if (res.ok) { alert("Postado!"); location.reload(); }
+    } catch (err) { alert("Erro ao postar."); }
 }
 
-// --- NOTIFICAÇÕES ---
-async function checkNotifications() {
-    if (!currentUser) return;
-    try {
-        const res = await fetch(`${API_URL}/notifications/${currentUser.id}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        
-        const badge = document.getElementById('badgeNotificacao');
-        const dropdown = document.getElementById('notifDropdown');
-        if (!badge || !dropdown) return;
-
-        if (data && data.length > 0) {
-            badge.innerText = data.length;
-            badge.style.display = 'inline-block';
-            dropdown.innerHTML = data.map(n => `
-                <div class="notif-item" style="padding:12px; border-bottom:1px solid #eee;">
-                    <p style="font-size:0.9rem;"><b>${n.sender_name}</b> enviou uma resposta.</p>
-                    <p style="font-size:0.8rem; color:gray; font-style:italic">"${n.message}"</p>
-                    <div style="display:flex; gap:5px; margin-top:8px;">
-                        <button class="btn-save" style="padding:4px 8px; font-size:11px" onclick="responderNotificacao(${n.id}, 'accepted')">Aceitar</button>
-                        <button class="btn-outline" style="padding:4px 8px; font-size:11px" onclick="responderNotificacao(${n.id}, 'rejected')">Recusar</button>
-                    </div>
-                </div>
-            `).join('');
-        } else {
-            badge.style.display = 'none';
-            dropdown.innerHTML = '<p style="padding:10px; color:gray; text-align:center;">Sem notificações</p>';
-        }
-    } catch (err) { console.error("Erro ao checar notificações", err); }
-}
-
-async function responderNotificacao(id, acao) {
-    try {
-        const res = await fetch(`${API_URL}/notifications/respond`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ notification_id: parseInt(id), action: acao })
-        });
-        if (res.ok) {
-            if (acao === 'accepted') alert("Solicitação aceita!");
-            checkNotifications();
-        }
-    } catch (err) { alert("Erro ao responder solicitação."); }
-}
-
-function toggleNotif() {
-    const drop = document.getElementById('notifDropdown');
-    if (drop) drop.style.display = (drop.style.display === 'block') ? 'none' : 'block';
-}
-
-// --- MODAIS E REIVINDICAÇÃO ---
-function abrirVerificacao(id) {
-    if (!currentUser) return abrirModalAuth();
-    currentItem = itensCadastrados.find(i => i.id === id);
-    if (!currentItem) return;
-
-    if (currentItem.user_id === currentUser.id) {
-        alert("Você postou este item. Verifique as notificações para responder interessados.");
-        return;
-    }
-
-    const campoPergunta = document.getElementById('perguntaExibida');
-    if (campoPergunta) campoPergunta.innerText = currentItem.pergunta;
-    document.getElementById('modalConvite').style.display = 'flex';
-}
-
-async function enviarPedidoChat() {
-    const campoResposta = document.getElementById('respostaSeguranca');
-    const respostaTexto = campoResposta?.value.trim();
-    
-    if (!respostaTexto || !currentItem) return alert("Preencha a resposta para continuar.");
-
-    const payload = {
-        item_id: parseInt(currentItem.id),
-        owner_id: currentItem.user_id,
-        requester_id: currentUser.id,
-        requester_name: currentUser.user_metadata.full_name || "Usuário Interessado",
-        answer: respostaTexto
-    };
-
-    try {
-        const btn = document.querySelector('#modalConvite .btn-save');
-        btn.disabled = true; btn.innerText = "Enviando...";
-
-        const response = await fetch(`${API_URL}/notifications`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) throw new Error("Erro ao enviar pedido.");
-
-        alert("Solicitação enviada! Aguarde a aprovação do dono.");
-        campoResposta.value = "";
-        fecharModalConvite();
-    } catch (err) {
-        alert("Falha ao enviar: " + err.message);
-    } finally {
-        const btn = document.querySelector('#modalConvite .btn-save');
-        if (btn) { btn.disabled = false; btn.innerText = "Enviar Resposta"; }
-    }
-}
-
-// Controles de Fechamento
+// Funções de Modal (Permanecem as mesmas para abrir/fechar)
+function abrirModalAuth() { document.getElementById('modalAuth').style.display = 'flex'; }
 function fecharModalAuth() { document.getElementById('modalAuth').style.display = 'none'; }
-function fecharModalConvite() { document.getElementById('modalConvite').style.display = 'none'; }
-function fecharModalPost() { document.getElementById('modalPost').style.display = 'none'; }
-function fecharModal(id) { document.getElementById(id).style.display = 'none'; }
-function fecharChat() { document.getElementById('modalChat').style.display = 'none'; }
+function toggleAuthMode() {
+    isLoginMode = !isLoginMode;
+    document.getElementById('authTitle').innerText = isLoginMode ? "Entrar" : "Criar Conta";
+    document.getElementById('camposCadastroAdicionais').style.display = isLoginMode ? "none" : "block";
+}
